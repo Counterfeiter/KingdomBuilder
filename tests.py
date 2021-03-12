@@ -1,5 +1,10 @@
 import unittest
-from board import Game, Player, Rules, Board, CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
+from board import Board
+from player import Player
+from rules import Rules
+from game import Game
+
+from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 board_env = """
 . . W . . . . . . . . . W . . . . . . .
@@ -73,7 +78,7 @@ class TestRules(unittest.TestCase):
     def test_possiblemove(self):
         set_default_terrain(self.board)
         move_options = self.board.getpossiblemove(self.players[0], SPECIALLOCATION.WATER)
-        self.board.print_selection(move_options)
+        #self.board.print_selection(move_options)
         self.assertEqual(len(move_options), 9)
         move_options = self.board.getpossiblemove(self.players[3], SPECIALLOCATION.MOUNTAIN)
         #self.board.print_selection(move_options)
@@ -106,7 +111,7 @@ class TestRules(unittest.TestCase):
         game = Game(4)
         #fix quadrants
         game.board.board_env = game.board.joinquadrants(["ORACLE", "PADDOCK", "HARBOR", "FARM"])
-        print(game.board)
+        #print(game.board)
 
         self.assertEqual(game.place_settlement(2,7, TERRAIN.GRASS), True)
         self.assertEqual(game.player.settlements, 39)
@@ -116,7 +121,19 @@ class TestRules(unittest.TestCase):
         self.assertEqual(game.place_settlement(0,6, TERRAIN.GRASS), False)
         self.assertEqual(game.place_settlement(1,6, TERRAIN.GRASS), True)
         self.assertEqual(game.board.resulting_board()[3][7], 't')
-        print(game.board)
+        #print(game.board)
+
+    def test_tavernmoves(self):
+        game = Game(4)
+        #fix quadrants
+        game.board.board_env = game.board.joinquadrants(["ORACLE", "PADDOCK", "HARBOR", "FARM"])
+        overlay_terrain(game.board)
+        moves = game.board.getpossibletavernmove(self.players[0])
+        moves.update(game.board.getpossibletavernmove(self.players[1]))
+        moves.update(game.board.getpossibletavernmove(self.players[2]))
+        moves.update(game.board.getpossibletavernmove(self.players[3]))
+        #game.board.print_selection(moves)
+        self.assertEqual(len(moves), 8)
         
     def test_rulecards(self):
         set_default_terrain(self.board)

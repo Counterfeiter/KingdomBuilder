@@ -1,116 +1,9 @@
 import random
-from enum import Enum, unique
 import os
 
-@unique
-class BOARDSECTIONS(Enum):
-    ORACLE = 1
-    FARM = 2
-    OASIS = 3
-    TOWER = 4
-    TAVERN = 5
-    BARN = 6
-    HARBOR = 7
-    PADDOCK= 8
+from player import Player
+from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
-    @staticmethod
-    def list():
-        return list(BOARDSECTIONS)
-
-@unique
-class TERRAIN(Enum):
-    GRASS = 'G'
-    FLOWER = 'B' #german "blume"
-    FOREST = 'F'
-    CANYON = 'S' #german "stein"
-    DESERT = 'D'
-
-    @staticmethod
-    def list():
-        return list(TERRAIN)
-    
-    @staticmethod
-    def list_values():
-        return [e.value for e in TERRAIN]
-
-
-@unique
-class SPECIALLOCATION(Enum):
-    WATER = 'W'
-    MOUNTAIN = 'M'
-    CASTLE = 'C'
-    TOWNFULL = 'T'
-    TOWNHALF = 't'
-    TOWNEMPTY = 'X'
-
-    @staticmethod
-    def list():
-        return list(SPECIALLOCATION)
-
-@unique
-class CARDRULES(Enum):
-    CASTLE = 0
-    DICOVERES = 1
-    KNIGHTS = 2
-    FISHERMEN = 3
-    MINERS = 4
-    LOARDS = 5
-    FARMERS = 6
-    HERMITS = 7
-    CITIZENS = 8
-    WORKER = 9
-
-    @staticmethod
-    def list():
-        return list(CARDRULES)
-
-
-class Player:
-    def __init__(self, index:str):
-        self.takecard()
-        self.player_index = index
-        self.starter = False # player starts the round
-        self._score = 0
-        self.settlements = 40
-        self.towns = []
-
-    def takecard(self):
-        self.current_card = random.choice(TERRAIN.list())
-        return self.current_card
-
-    def addTown(self, town : BOARDSECTIONS):
-        self.towns.append(town)
-
-    def setStarter(self):
-        self.starter = True
-
-    def isStarter(self):
-        return self.starter
-
-    def decrement_settlement(self):
-        self.settlements -= 1
-        if self.settlements < 0:
-            raise ValueError()
-
-    def increment_settlement(self):
-        self.settlements += 1
-        if self.settlements > 40:
-            raise ValueError()
-
-    def isfinished(self):
-        return self.settlements == 0
-
-
-    @property
-    def score(self):
-        return self._score
-
-    @score.setter
-    def score(self, score):
-        self._score = score
-
-    def __str__(self):
-        return self.player_index
 
 class Board:
 
@@ -193,6 +86,83 @@ class Board:
             return True
         return False
 
+    def getpossibletavernmove(self, player):
+        board = self.resulting_board()
+        moves = set()
+
+        tavern_sets =  {    0: #"even":
+                            {   "neighbours": [
+                                    #horizonal
+                                    set({(0,1),(0,2)}),
+                                    set({(0,-1),(0,-2)}),
+                                    #diagonal right
+                                    set({(1,0),(2,1)}),
+                                    set({(-1,0),(-2,1)}),
+                                    #diagonal left
+                                    set({(1,-1),(2,-1)}),
+                                    set({(-1,-1),(-2,-1)}),
+                                ],
+                                "options": [
+                                    #horizonal
+                                    (0,3),
+                                    (0,-3),
+                                    #diagonal right
+                                    (3, 1),
+                                    (-3,1),
+                                    #diagonal left
+                                    (3, -2),
+                                    (-3,-2),
+                                ]
+                            }, 1: #"uneven":
+                            { "neighbours": [
+                                    #horizonal - same like even - do not check again
+                                    set({(0,1),(0,2)}),
+                                    set({(0,-1),(0,-2)}),
+                                    #diagonal right
+                                    set({(1,1),(2,1)}),
+                                    set({(-1,1),(-2,1)}),
+                                    #diagonal left
+                                    set({(1,0),(2,-1)}),
+                                    set({(-1,0),(-2,-1)}),
+                                ],
+                                "options": [
+                                    #horizonal
+                                    (0,3),
+                                    (0,-3),
+                                    #diagonal right
+                                    (3, 2),
+                                    (-3,2),
+                                    #diagonal left
+                                    (3, -1),
+                                    (-3,-1),
+                                ]
+                            }
+                        }
+
+        for row in range(20):
+            for col in range(20):
+                if board[row][col] != str(player):
+                    continue
+                comp_set = tavern_sets[row%2]
+                for i, neighbour in enumerate(comp_set["neighbours"]):
+                    match = True
+                    try:
+                        for dr, dc in neighbour:
+                                if board[row + dr][col + dc] != str(player):
+                                    match = False
+                                    break
+                        
+                        res_row = row + comp_set["options"][i][0]
+                        res_col = col + comp_set["options"][i][1]
+                        if res_row < 0 or res_row > 19 or res_col < 0 or res_col > 19:
+                            continue
+                        if match and board[res_row][res_col] in TERRAIN.list_values():
+                            moves.add((res_row, res_col))
+                    except:
+                        pass
+        
+        return moves
+
     def getpossiblepaddockmove(self, player, row, col):
         board = self.resulting_board()
         moves = set()
@@ -205,6 +175,9 @@ class Board:
         moves = {(r,c) for r,c in moves if 20>r>-1 and 20>c>-1 and board[r][c] in TERRAIN.list_values() }
         
         return moves
+
+    def hassettlement(self, player, row, col):
+        return self.board_settlements[row][col] == str(player)
 
     def getpossiblemove(self, player : Player, env_field):
         if type(env_field) != str:
@@ -294,168 +267,3 @@ class Board:
         if board2 == None:
             board2 = board1
         return (object1 == None or board1[row][col] == object1) and object2 in {board1[r][c] for r,c in Board.neighbours(row, col)}
-
-class Rules:
-
-    def __init__(self, board : Board, cards: list = []):
-        self.board = board
-        if len(cards) == 3:
-            self.rules = [CARDRULES.CASTLE] + cards
-        else:
-            self.randomcards()
-
-    def randomcards(self):
-        self.rule_set = CARDRULES.list()[1:]
-        self.rules = [CARDRULES.CASTLE]
-        self.rules += random.sample(self.rule_set, 3)
-        return self.rules
-
-    def score(self, player_list : list):
-        player_score = [0.0] * len(player_list)
-
-        quadrant_houses_per_player = [ [0]*len(player_list) for i in range(4)]
-
-        score_per_rule = [ [0] * len(CARDRULES) for i in range(len(player_list))]
-
-        board_copy_score_7 = self.board.resulting_board()
-        board_copy = self.board.resulting_board()
-
-        quadrants = self.board.quadrants()
-
-        for i, player_class in enumerate(player_list):
-            player = str(player_class)
-            ### row and column based counting
-            max_settlements_row = 0
-            max_settlements_group = 0
-            for row in range(20):
-                max_settlements_row_current = 0
-                if CARDRULES.DICOVERES in self.rules:
-                    score_per_rule[i][CARDRULES.DICOVERES.value] += (player in board_copy[row])
-                for col in range(20):
-                    max_settlements_row_current += (board_copy[row][col] == player)
-                    if CARDRULES.CASTLE in self.rules:
-                        score_per_rule[i][CARDRULES.CASTLE.value] += 3 * Board.is_neighbour(board_copy, None, row, col, SPECIALLOCATION.CASTLE.value, player)
-                    if CARDRULES.WORKER in self.rules:
-                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.CASTLE.value)
-                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNFULL)
-                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNHALF)
-                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNEMPTY)
-                    if CARDRULES.FISHERMEN in self.rules:
-                        score_per_rule[i][CARDRULES.FISHERMEN.value] += (Board.is_neighbour(board_copy, self.board.env, row, col, player, SPECIALLOCATION.WATER.value) and not self.board.is_env(row,col, 'W'))
-                    if CARDRULES.MINERS in self.rules:
-                        score_per_rule[i][CARDRULES.MINERS.value] += Board.is_neighbour(board_copy, self.board.env, row, col, player, SPECIALLOCATION.MOUNTAIN.value)
-                    is_single_group, num_of_settlements = self.rule_7_score(player, board_copy_score_7, row, col, 0)
-                    if num_of_settlements > max_settlements_group:
-                        max_settlements_group = num_of_settlements
-                    if CARDRULES.HERMITS in self.rules:
-                        score_per_rule[i][CARDRULES.HERMITS.value] += is_single_group
-
-                if max_settlements_row_current > max_settlements_row:
-                    max_settlements_row =  max_settlements_row_current
-            
-            
-            if CARDRULES.KNIGHTS in self.rules:
-                score_per_rule[i][CARDRULES.KNIGHTS.value] += max_settlements_row * 2
-            if CARDRULES.CITIZENS in self.rules:
-                score_per_rule[i][CARDRULES.CITIZENS.value] += max_settlements_group // 2
-
-            if CARDRULES.LOARDS in self.rules or CARDRULES.FARMERS in self.rules:
-                ## quadrant based counting
-                for index_qua, quadrant in enumerate(quadrants):
-                    for row in range(10):
-                        for col in range(10):
-                            quadrant_houses_per_player[i][index_qua] += (quadrant[row][col] == player)
-
-                if CARDRULES.FARMERS in self.rules:
-                    score_per_rule[i][CARDRULES.FARMERS.value] += min(quadrant_houses_per_player[i]) * 3
-
-        #quadrant based on settlements from other players
-        if CARDRULES.LOARDS in self.rules:
-            tran_ply_qua = [ list(e) for e in zip(*quadrant_houses_per_player)]
-            for qua in tran_ply_qua:
-
-                for gold in [12, 6]:
-                    max_houses = max(qua)
-                    if max_houses == 0:
-                        continue
-                    for player, houses in enumerate(qua):
-                        if max_houses == houses:
-                            score_per_rule[player][CARDRULES.LOARDS.value] += gold
-                            qua[player] = 0
-
-        for i in range(len(player_list)):
-            player_list[i].score = sum(score_per_rule[i])
-            player_score[i] = sum(score_per_rule[i])
-
-        self.player_score_per_rule = score_per_rule
-
-        return player_score
-
-    def rule_7_score(self, player, board_modify, row, col, counter):
-        is_char = (board_modify[row][col] == player)
-        board_modify[row][col] = "" if is_char else board_modify[row][col]
-
-        if is_char:
-            counter += 1
-            for neighbour in self.board.neighbours(row, col):
-                _, counter = self.rule_7_score(player, board_modify, *neighbour, counter)
-
-        return is_char, counter
-
-
-
-class Game:
-    def __init__(self, num_players : int):
-        #init random quadrants from folder quadrants
-        self.board = Board("quadrants")
-        #init random rules cards
-        self.rules = Rules(self.board)
-        #init players
-        self.players = [ Player(str(ind)) for ind in range(1, num_players + 1) ]
-        #set random start player
-        self.current_player = random.randrange(0, num_players)
-        self.players[self.current_player].setStarter()
-
-    @property
-    def player(self):
-        return self.players[self.current_player]
-
-    def nextPlayer(self):
-        self.current_player += 1
-        if len(self.players) >= self.current_player:
-            self.current_player = 0
-
-    def place_settlement(self, row, col, env_rule):
-        if self.board.place_settlement(self.player, row, col, env_rule):
-            self.player.decrement_settlement()
-            town, tcoord = self.checkTown(row, col)
-            if town != None:
-                self.board.grab_town(*tcoord)
-                self.player.addTown(town)
-            return True
-
-        return False
-
-    def checkTown(self, row, col):
-        nei_list = self.board.neighbours(row, col)
-        for loc in nei_list:
-            board = self.board.resulting_board()
-            board[row][col] = ' ' # delete current settlement temporary 
-            #settlement placed next to town with left quests - no settlement could be next to two towns
-            if board[loc[0]][loc[1]] in [SPECIALLOCATION.TOWNFULL.value, SPECIALLOCATION.TOWNHALF.value]:
-                #check if no other settlement is placed next to 
-                if not self.board.is_neighbour(board, None, loc[0], loc[1], None, str(self.player)):
-                    return self.board.town_to_boardsection(*loc), loc
-
-        return None, None
-
-    def endmove(self):
-        if self.player.isfinished():
-            score = self.rules.score(self.players)
-            print(score)
-
-game = Game(4)
-
-print(game.board)
-print(game.rules.score(game.players))
-print(game.players[0].takecard())

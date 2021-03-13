@@ -45,9 +45,9 @@ class Rules:
                         score_per_rule[i][CARDRULES.CASTLE.value] += 3 * Board.is_neighbour(board_copy, None, row, col, SPECIALLOCATION.CASTLE.value, player)
                     if CARDRULES.WORKER in self.rules:
                         score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.CASTLE.value)
-                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNFULL)
-                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNHALF)
-                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNEMPTY)
+                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNFULL.value)
+                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNHALF.value)
+                        score_per_rule[i][CARDRULES.WORKER.value] += Board.is_neighbour(board_copy, None, row, col, player, SPECIALLOCATION.TOWNEMPTY.value)
                     if CARDRULES.FISHERMEN in self.rules:
                         score_per_rule[i][CARDRULES.FISHERMEN.value] += (Board.is_neighbour(board_copy, self.board.env, row, col, player, SPECIALLOCATION.WATER.value) and not self.board.is_env(row,col, 'W'))
                     if CARDRULES.MINERS in self.rules:

@@ -52,6 +52,29 @@ board_settlements = """
  . . . 4 . . . 3 . . 4 4 . 4 . 2 . . . .
 """
 
+board_mixed = """
+G G F F F W G F F B S S S D D W D D D D
+ G B F F W G F F B B M M S D D W D D D D
+G B B F W G G B B B M M S M M W D D T B
+ B B F F W G M B D D M S M M W M D B B B
+S B C F W G D D D D S S F F W M M S B B
+ S S F W G G M M D D S 1 1 W S S S M B B
+S S W W W G D D D S S t F 1 W B B B B B
+ W W 1 1 W W T S M S G G F W G C G B G F
+W D C G W M W S S S G G F F W G G G G F
+ W D D W W W W S S S G G F F W G G G F F
+G G G F F W G F F F D D S W W F F F G G
+ G G G C F W G F F F D C S W F F F T G G
+G B B G F F W G G F S S S B B B F S B B
+ B B S G F W B T F F S S B B W D D S S B
+B B B S S W B B W W S 2 2 W B B D D S S
+ M M S G G W W W D D G 2 t B W B W D D S
+S S S M G B B B D D G G 2 F B B W W D D
+ S S C D M D B B S S G G F F M W W W D W
+W W W D D D D M S S G M F F W W W W W W
+ W W W W D D D D D S F F F W W W W W W W
+"""
+
 def overlay_terrain(board):
     board_load = [row.split() for row in board_env.strip().split("\n")]
     for y in range(20):
@@ -61,6 +84,17 @@ def overlay_terrain(board):
 
     board.board_env = board_load
     board.board_settlements = [row.split() for row in board_settlements.strip().split("\n")]
+
+def set_mixed(board):
+    board_load = [row.split() for row in board_mixed.strip().split("\n")]
+    player_list = ["1", "2", "3","4"]
+    for y in range(20):
+        for x in range(20):
+            if board_load[y][x] in player_list:
+                board.board_settlements[y][x] = board_load[y][x]
+            else:
+                board.board_settlements[y][x] = ' '
+                board.board_env[y][x] = board_load[y][x]
 
 def set_default_terrain(board):
     board.board_env = [row.split() for row in board_env.strip().split("\n")]
@@ -95,11 +129,11 @@ class TestRules(unittest.TestCase):
         self.assertEqual(self.board.reset_settlement(self.players[1], 8, 8), False)
         self.assertEqual(self.board.reset_settlement(self.players[2], 0, 0), True)
 
-    def test_barnmove(self):
+    '''def test_barnmove(self):
         overlay_terrain(self.board)
         self.assertEqual(len(self.board.getpossiblepaddockmove(self.players[3], 7, 12)), 0)
         moves = self.board.getpossiblepaddockmove(self.players[3], 12, 7)
-        #self.board.print_selection(moves)
+        #self.board.print_selection(moves)'''
 
     def test_town_to_quadrant(self):
         self.assertEqual(self.board.town_to_boardsection(2, 8).name, self.board.quadrant_order[0])
@@ -134,7 +168,28 @@ class TestRules(unittest.TestCase):
         moves.update(game.board.getpossibletavernmove(self.players[3]))
         #game.board.print_selection(moves)
         self.assertEqual(len(moves), 8)
-        
+
+    def test_paddockmoves(self):
+        game = Game(4)
+        #fix quadrants
+        game.board.board_env = game.board.joinquadrants(["ORACLE", "PADDOCK", "HARBOR", "FARM"])
+        overlay_terrain(game.board)
+        moves = game.board.getpossiblepaddockmove(game.players[0], 1, 5)
+        #game.board.print_selection(moves)
+        self.assertEqual(len(moves), 2)
+        moves = game.board.getpossiblepaddockmove(game.players[3], 7, 3)
+        #game.board.print_selection(moves)
+        self.assertEqual(len(moves), 4)
+
+    def test_mixed_board_rule(self):
+        set_mixed(self.board)
+        players = [ Player(ind) for ind in ["1", "2"] ]
+        rules = Rules(self.board, [CARDRULES.WORKER, CARDRULES.FISHERMEN, CARDRULES.HERMITS])
+        score_out = rules.score(players)
+        self.assertEqual(sum(score_out), 15)
+        #print(score_out)
+        #print(rules.player_score_per_rule)
+
     def test_rulecards(self):
         set_default_terrain(self.board)
         #print(self.board)

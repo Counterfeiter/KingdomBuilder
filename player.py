@@ -3,12 +3,13 @@ import random
 from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 class Player:
+    MAX_SETTLEMENTS = 40
     def __init__(self, index:str):
         self.takecard()
         self.player_index = index
         self.starter = False # player starts the round
-        self._score = 0
-        self.settlements = 40
+        self.__score = 0
+        self.settlements = self.MAX_SETTLEMENTS
         self.towns = []
 
     @property
@@ -35,7 +36,7 @@ class Player:
 
     def increment_settlement(self):
         self.settlements += 1
-        if self.settlements > 40:
+        if self.settlements > self.MAX_SETTLEMENTS:
             raise ValueError()
 
     def isfinished(self):
@@ -44,11 +45,11 @@ class Player:
 
     @property
     def score(self):
-        return self._score
+        return self.__score
 
     @score.setter
     def score(self, score):
-        self._score = score
+        self.__score = score
 
     def __str__(self):
         return self.player_index

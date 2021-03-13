@@ -7,6 +7,10 @@ from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 class Game:
     def __init__(self, num_players : int):
+        # 4 player is orginal... 
+        # but in expansion modes you get settlements for a 5th player
+        if num_players < 1 or num_players > 5:
+            raise ValueError()
         #init random quadrants from folder quadrants
         self.board = Board("quadrants")
         #init random rules cards
@@ -18,18 +22,33 @@ class Game:
         self.players[self.current_player].setStarter()
 
     @property
+    def __version__(self):
+        return "0.0.1"
+
+    @property
     def player(self):
         return self.players[self.current_player]
 
     def nextPlayer(self):
         self.current_player += 1
-        if len(self.players) >= self.current_player:
+        if self.current_player >= len(self.players):
             self.current_player = 0
 
     def place_settlement(self, row, col, env_rule):
         if self.board.place_settlement(self.player, row, col, env_rule):
             self.player.decrement_settlement()
             town, tcoord = self.checkTown(row, col)
+            if town != None:
+                self.board.grab_town(*tcoord)
+                self.player.addTown(town)
+            return True
+
+        return False
+
+    def move_settlement(self, row_from, col_from, row_to, col_to):
+        if self.board.move_settlement(self.player, row_from, col_from, row_to, col_to):
+            # TODO: delete town if leaving all/last settlement(s)
+            town, tcoord = self.checkTown(row_to, col_to)
             if town != None:
                 self.board.grab_town(*tcoord)
                 self.player.addTown(town)
@@ -81,6 +100,7 @@ class Game:
             return False
 
         while (len(self.townstoplay) > 0 or self.main_move > 0) and self.player.settlements != 0:
+            print("\nRule Cards: {:^16}{:^16}{:^16}{:^16}\n".format(*[x.name for x in self.rules.rules]))
             print(self.board)
             if self.main_move > 0:
                 print("main: Start main move and place three settlements on {:s} ({:s})".format(self.player.card.name, self.player.card.value))
@@ -126,25 +146,30 @@ class Game:
                         break
                     if coord:
                         if self.place_settlement(*coord, TERRAIN.GRASS):
+                            self.townstoplay.remove(BOARDSECTIONS.FARM)
                             break
             elif town_special == BOARDSECTIONS.PADDOCK:
                 while 1:
+                    moves = self.board.getpossiblemove(self.player, str(self.player))
+                    self.board.print_selection(moves)
                     print("Select a settlement for moving")
-                    coord, abort = self.getcoordinates()
+                    coord_from, abort = self.getcoordinates()
                     if abort:
                         break
-                    if coord and self.board.hassettlement(self.player, *coord):
-                        moves = self.board.getpossiblepaddockmove(self.player, *coord)
+                    if coord_from and self.board.hassettlement(self.player, *coord_from):
+                        moves = self.board.getpossiblepaddockmove(self.player, *coord_from)
                         if len(moves) == 0:
                             print("No moving possbile with this selection")
                             continue
                         self.board.print_selection(moves)
                         print("Jump to...")
-                        coord, abort = self.getcoordinates()
+                        coord_to, abort = self.getcoordinates()
                         if abort:
                             break
-                        if coord and set(coord) in moves and self.place_settlement(*coord, TERRAIN[self.board.board_env[coord[0]][coord[1]]]):
-                            break               
+                        if coord_to and coord_to in moves:
+                            if self.move_settlement(*coord_from, *coord_to):
+                                self.townstoplay.remove(BOARDSECTIONS.PADDOCK)
+                                break
             elif town_special == BOARDSECTIONS.ORACLE:
                 while 1:
                     moves = self.board.getpossiblemove(self.player, self.player.card)
@@ -153,26 +178,31 @@ class Game:
                     if abort:
                         break
                     if coord:
-                        if self.place_settlement(*coord, TERRAIN.GRASS):
+                        if self.place_settlement(*coord, self.player.card):
+                            self.townstoplay.remove(BOARDSECTIONS.ORACLE)
                             break
             elif town_special == BOARDSECTIONS.HARBOR:
                 while 1:
+                    moves = self.board.getpossiblemove(self.player, str(self.player))
+                    self.board.print_selection(moves)
                     print("Select a settlement for moving")
-                    coord, abort = self.getcoordinates()
+                    coord_from, abort = self.getcoordinates()
                     if abort:
                         break
-                    if coord and self.board.hassettlement(self.player, *coord):
-                        moves = self.board.getpossiblemove(self.player, SPECIALLOCATION.WATER)
+                    if coord_from and self.board.hassettlement(self.player, *coord_from):
+                        moves = self.board.getpossiblemove(self.player, SPECIALLOCATION.WATER, coord_from)
                         if len(moves) == 0:
-                            print("No moving possbile with this selection")
+                            print("No moving possible with this selection")
                             continue
                         self.board.print_selection(moves)
                         print("Go to...")
-                        coord, abort = self.getcoordinates()
+                        coord_to, abort = self.getcoordinates()
                         if abort:
                             break
-                        if coord and set(coord) in moves and self.place_settlement(*coord, SPECIALLOCATION.WATER):
-                            break  
+                        if coord_to and coord_to in moves:
+                            if self.move_settlement(*coord_from, *coord_to):
+                                self.townstoplay.remove(BOARDSECTIONS.HARBOR)
+                                break
         self.endmove()
 
         return True

@@ -65,13 +65,6 @@ class Board:
 
         return board_merged
 
-    def place_settlement(self, player : Player, row, col, env_rule):
-        place_options = self.getpossiblemove(player, env_rule)
-        if (row, col) in place_options:
-            self.board_settlements[row][col] = str(player)
-            return True
-        return False
-
     def grab_town(self, row, col):
         if self.board_env[row][col] == SPECIALLOCATION.TOWNFULL.value:
             self.board_env[row][col] = SPECIALLOCATION.TOWNHALF.value
@@ -80,9 +73,27 @@ class Board:
         else:
             raise ValueError()
 
+    def place_settlement(self, player : Player, row, col, env_rule):
+        place_options = self.getpossiblemove(player, env_rule)
+        if (row, col) in place_options:
+            self.board_settlements[row][col] = str(player)
+            return True
+        return False
+
     def reset_settlement(self, player : Player, row, col):
         if self.board_settlements[row][col] == str(player):
             self.board_settlements[row][col] = ' '
+            return True
+        return False
+
+    def move_settlement(self, player : Player, row_from, col_from, row_to, col_to):
+        board = self.resulting_board()
+        possible_env_list = TERRAIN.list_values() + [SPECIALLOCATION.WATER.value]
+        if board[row_from][col_from] != str(player):
+            return False
+        if board[row_to][col_to] in possible_env_list:
+            self.board_settlements[row_to][col_to] = str(player)
+            self.board_settlements[row_from][col_from] = ' '
             return True
         return False
 
@@ -171,7 +182,7 @@ class Board:
             return moves
 
         for dr, dc in {(0,-2), (0,2), (-2,-1), (-2,1), (2,-1), (2,1)}:
-            moves.add((row + dr, col + dc + (1 if dr != 0 and row%2 == 1 else 0)))
+            moves.add((row + dr, col + dc ))
         moves = {(r,c) for r,c in moves if 20>r>-1 and 20>c>-1 and board[r][c] in TERRAIN.list_values() }
         
         return moves
@@ -179,7 +190,8 @@ class Board:
     def hassettlement(self, player, row, col):
         return self.board_settlements[row][col] == str(player)
 
-    def getpossiblemove(self, player : Player, env_field):
+    # use blacklist to not return neighbours of a selected settlement for moving options (like harbor)
+    def getpossiblemove(self, player : Player, env_field, coord_blacklist: tuple = None):
         if type(env_field) != str:
             env_field = env_field.value # switch from enum to string representation
 
@@ -191,7 +203,7 @@ class Board:
             for col in range(20):
                 if self.is_env(row, col, env_field, board):
                     fields_free.add((row, col))
-                if str(player) == board[row][col]:
+                if str(player) == board[row][col] and coord_blacklist != (row, col):
                     for neighbour in self.neighbours(row, col):
                         if self.is_env(*neighbour, env_field, board):
                             fields_in_range.add(neighbour)
@@ -208,7 +220,8 @@ class Board:
 
     def board_with_selection(self, field_set = None):
         board = self.resulting_board()
-        str_out = "\n     "
+        str_out = "{:^40}{:^40}\n".format(self.quadrant_order[0], self.quadrant_order[1])
+        str_out += "     "
         for i in range(20):
             str_out += " {:02d} ".format(i)
         str_out += "\n"
@@ -241,9 +254,16 @@ class Board:
 
                 str_out += "".join(col_delimit) + col
 
+            if i_row % 2:
+                str_out += "   {:02d}".format(i_row)
+            else:
+                str_out += "     {:02d}".format(i_row)
             str_out += "\n"
-
-        return str_out[:-1]
+        str_out += "     "
+        for i in range(20):
+            str_out += " {:02d} ".format(i)
+        str_out += "\n{:^40}{:^40}".format(self.quadrant_order[2], self.quadrant_order[3])
+        return str_out
 
     def print_selection(self, field_set = None):
         print(self.board_with_selection(field_set))

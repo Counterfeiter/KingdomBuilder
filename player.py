@@ -53,3 +53,6 @@ class Player:
 
     def __str__(self):
         return self.player_index
+
+    def __int__(self):
+        return int(self.player_index)

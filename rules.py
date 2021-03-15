@@ -21,7 +21,7 @@ class Rules:
     def score(self, player_list : list):
         player_score = [0.0] * len(player_list)
 
-        quadrant_houses_per_player = [ [0]*len(player_list) for i in range(4)]
+        quadrant_houses_per_player = [ [0]*4 for i in range(len(player_list))]
 
         score_per_rule = [ [0] * len(CARDRULES) for i in range(len(player_list))]
 

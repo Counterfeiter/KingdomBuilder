@@ -1,3 +1,4 @@
+from enum import Enum, unique
 import random
 
 from board import Board
@@ -5,21 +6,36 @@ from rules import Rules
 from player import Player
 from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
+@unique
+class DOACTION(Enum):
+    MAINMOVE = 0
+    END = 1
+    ORACLE = 2
+    FARM = 3
+    HARBORSELECT = 4
+    HARBORSET = 5
+    PADDOCKSELECT = 6
+    PADDOCKSET = 7
+
 class Game:
-    def __init__(self, num_players : int):
+    def __init__(self, num_players : int, quadrants : list = [], rules : list = []):
         # 4 player is orginal... 
         # but in expansion modes you get settlements for a 5th player
         if num_players < 1 or num_players > 5:
             raise ValueError()
         #init random quadrants from folder quadrants
-        self.board = Board("quadrants")
+        self.board = Board("quadrants", quadrants)
         #init random rules cards
-        self.rules = Rules(self.board)
+        self.rules = Rules(self.board, rules)
         #init players
         self.players = [ Player(str(ind)) for ind in range(1, num_players + 1) ]
         #set random start player
         self.current_player = random.randrange(0, num_players)
         self.players[self.current_player].setStarter()
+        self.townstoplay = []
+        self.game_done = False
+        self.main_move = 3
+        self.old_action = None
 
     @property
     def __version__(self):
@@ -82,16 +98,77 @@ class Game:
         
         return (row, col), False
 
+    #controlled by an rl agent?
+    def singlestepmove(self, action : DOACTION, row, col):
+        if action == DOACTION.END:
+            if self.main_move == 0:
+                self.endmove()
+                self.startmove()
+                return True
+            else:
+                return False
+
+        # nothing to do
+        if not ((len(self.townstoplay) > 0 or self.main_move > 0) and self.player.settlements != 0):
+            return False
+        #main move and no settlements to place?
+        if action == DOACTION.MAINMOVE and self.main_move <= 0:
+            return False
+        #main move played in a sequence?
+        if self.main_move < 3 and self.main_move > 0 and action != DOACTION.MAINMOVE:
+            return False
+
+        if action == DOACTION.MAINMOVE:
+            if self.place_settlement(row, col, self.player.card):
+                self.main_move -= 1
+                return True
+        elif action == DOACTION.FARM and BOARDSECTIONS.FARM in self.townstoplay:
+            if self.place_settlement(row, col, TERRAIN.GRASS):
+                self.townstoplay.remove(BOARDSECTIONS.FARM)
+                return True
+        elif action == DOACTION.ORACLE and BOARDSECTIONS.ORACLE in self.townstoplay:
+            if self.place_settlement(row, col, self.player.card):
+                self.townstoplay.remove(BOARDSECTIONS.ORACLE)
+                return True
+        elif action == DOACTION.HARBORSELECT and BOARDSECTIONS.HARBOR in self.townstoplay:
+            if self.board.hassettlement(self.player, row, col):
+                self.select_coord = (row, col)
+                self.old_action = DOACTION.HARBORSELECT
+                return True
+        elif action == DOACTION.HARBORSET and self.old_action == DOACTION.HARBORSELECT:
+            moves = self.board.getpossiblemove(self.player, SPECIALLOCATION.WATER, self.select_coord)
+            if (row, col) in moves:
+                return False
+            if self.board.move_settlement(self.player, *self.select_coord, row, col):
+                self.townstoplay.remove(BOARDSECTIONS.HARBOR)
+                return True
+        elif action == DOACTION.PADDOCKSELECT and BOARDSECTIONS.PADDOCK in self.townstoplay:
+            if self.board.hassettlement(self.player, row, col):
+                self.select_coord = (row, col)
+                self.old_action = DOACTION.PADDOCKSELECT
+                return True
+        elif action == DOACTION.PADDOCKSET and self.old_action == DOACTION.PADDOCKSELECT:
+            moves = self.board.getpossiblepaddockmove(self.player, *self.select_coord)
+            if (row, col) not in moves:
+                return False
+            if self.board.move_settlement(self.player, *self.select_coord, row, col):
+                self.townstoplay.remove(BOARDSECTIONS.PADDOCK)
+                return True
+
+        return False
+            
     def startmove(self):
         #end game if starter is reached an any player is finished
         fin = [x.isfinished() for x in self.players]
         if self.player.isStarter() and True in fin:
             score = self.rules.score(self.players)
             print("Game ends with score: ", score)
+            self.game_done = True
             return False
 
         self.main_move = 3 #the settlements to place
         self.townstoplay = self.player.towns.copy()
+        self.old_action = None
 
         return True
 

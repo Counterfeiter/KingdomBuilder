@@ -7,10 +7,10 @@ from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 class Board:
 
-    def __init__(self, folderpath):
+    def __init__(self, folderpath, quadrants : list = []):
         self.max_players = 5
         self.playerlist = [str(x) for x in range(1, self.max_players + 1)]
-        self.board_settlements = [ [' ']*20 for i in range(20)]
+        self.board_settlements = [ ['0']*20 for i in range(20)]
         self.load_quadrants(folderpath)
         self.board_env = self.joinquadrants()
 
@@ -82,7 +82,7 @@ class Board:
 
     def reset_settlement(self, player : Player, row, col):
         if self.board_settlements[row][col] == str(player):
-            self.board_settlements[row][col] = ' '
+            self.board_settlements[row][col] = '0'
             return True
         return False
 
@@ -93,7 +93,7 @@ class Board:
             return False
         if board[row_to][col_to] in possible_env_list:
             self.board_settlements[row_to][col_to] = str(player)
-            self.board_settlements[row_from][col_from] = ' '
+            self.board_settlements[row_from][col_from] = '0'
             return True
         return False
 

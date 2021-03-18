@@ -2,28 +2,26 @@ import random
 import os
 
 from player import Player
+from quadrants import quadrants as quadrants_dict
 from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 
 class Board:
 
-    def __init__(self, folderpath, quadrants : list = []):
+    def __init__(self, quadrants : list = []):
         self.max_players = 5
         self.playerlist = [str(x) for x in range(1, self.max_players + 1)]
         self.board_settlements = [ ['0']*20 for i in range(20)]
-        self.load_quadrants(folderpath)
+        self.load_quadrants()
         self.board_env = self.joinquadrants()
 
-    def load_quadrants(self, foldername):
+    def load_quadrants(self):
         self.env_quadrants = {"quadrants" : []}
         quadrant_names = [x.name for x in BOARDSECTIONS.list()]
-        for filename in os.listdir(foldername):
-            qua_name = os.path.basename(filename)
+        for qua_name, raw_board in quadrants_dict.items():
             if qua_name in quadrant_names:
-                with open(os.path.join(foldername,filename), 'r') as file:
-                    raw_board = file.read()
-                    self.env_quadrants["quadrants"].append(qua_name)
-                    self.env_quadrants[qua_name] = [row.split() for row in raw_board.strip().split("\n")]
+                self.env_quadrants["quadrants"].append(qua_name)
+                self.env_quadrants[qua_name] = [row.split() for row in raw_board.strip().split("\n")]
 
     def joinquadrants(self, quadrant_name_list : list = []):
         if len(quadrant_name_list) != 4:

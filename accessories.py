@@ -57,6 +57,7 @@ class CARDRULES(Enum):
     HERMITS = 7
     CITIZENS = 8
     WORKER = 9
+    #MERCHANTS = 10 #TODO:
 
     @staticmethod
     def list():

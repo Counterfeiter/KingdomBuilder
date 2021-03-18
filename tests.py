@@ -105,7 +105,7 @@ class TestRules(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(TestRules, self).__init__(*args, **kwargs)
 
-        self.board = Board("quadrants")
+        self.board = Board()
         set_default_terrain(self.board)
         self.players = [ Player(ind) for ind in ["1", "2", "3", "4"] ]
 

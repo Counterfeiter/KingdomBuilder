@@ -1,21 +1,24 @@
 from enum import Enum, unique
 import random
+from typing import OrderedDict
 
 from board import Board
 from rules import Rules
 from player import Player
 from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
+import collections
 
 @unique
 class DOACTION(Enum):
-    MAINMOVE = 0
+    TAKENEWCARD = 0 # if no terrain for the given terrain card left - take a new one - otherwise card is taken after "END" without interaction
     END = 1
-    ORACLE = 2
-    FARM = 3
-    HARBORSELECT = 4
-    HARBORSET = 5
-    PADDOCKSELECT = 6
-    PADDOCKSET = 7
+    MAINMOVE = 2
+    ORACLE = 3
+    FARM = 4
+    HARBORSELECT = 5
+    HARBORSET = 6
+    PADDOCKSELECT = 7
+    PADDOCKSET = 8
 
 class Game:
     def __init__(self, num_players : int, quadrants : list = [], rules : list = []):
@@ -24,7 +27,7 @@ class Game:
         if num_players < 1 or num_players > 5:
             raise ValueError()
         #init random quadrants from folder quadrants
-        self.board = Board("quadrants", quadrants)
+        self.board = Board(quadrants)
         #init random rules cards
         self.rules = Rules(self.board, rules)
         #init players
@@ -97,16 +100,91 @@ class Game:
             return None, False
         
         return (row, col), False
+    
+    def checktownplay_possible(self, town):
+        return (self.main_move == 3 or self.main_move == 0) and self.player.settlements > 0 and town in self.townstoplay
+
+    def oldactionnoselection(self, pass_if = None):
+        return self.old_action == pass_if or not (self.old_action == DOACTION.HARBORSELECT or self.old_action == DOACTION.PADDOCKSELECT)
+
+    def actionstomoves(self):
+        # pa = possible actions
+        pa = OrderedDict()
+        
+        pa[DOACTION.TAKENEWCARD] = [0]
+        pa[DOACTION.END] = [1] if self.main_move == 0 or self.player.settlements == 0 else [0]
+        ### could be done in a loop... but it is a ordered dict, we will leave at as reference
+        # for the flattend action mask array
+        pa[DOACTION.MAINMOVE] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.ORACLE] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.FARM] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.HARBORSELECT] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.HARBORSET] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.PADDOCKSELECT] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.PADDOCKSET] = [ [0]*20 for i in range(20)]
+        
+
+        if self.main_move > 0 and self.player.settlements > 0:
+            moves = self.board.getpossiblemove(self.player, self.player.card)
+            for coord in moves:
+                pa[DOACTION.MAINMOVE][coord[0]][coord[1]] = 1
+            #check if player could take a new card 
+            if len(moves) <= 0:
+                pa[DOACTION.TAKENEWCARD][0] = 1
+
+        if self.checktownplay_possible(BOARDSECTIONS.FARM):
+            moves = self.board.getpossiblemove(self.player, TERRAIN.GRASS)
+            for coord in moves:
+                pa[DOACTION.FARM][coord[0]][coord[1]] = 1
+
+        if self.checktownplay_possible(BOARDSECTIONS.ORACLE):
+            moves = self.board.getpossiblemove(self.player, self.player.card)
+            for coord in moves:
+                pa[DOACTION.ORACLE][coord[0]][coord[1]] = 1
+            if len(moves) <= 0:
+                pa[DOACTION.TAKENEWCARD][0] = 1
+
+        if self.checktownplay_possible(BOARDSECTIONS.PADDOCK) and self.oldactionnoselection():
+            moves = self.board.getpossiblemove(self.player, str(self.player))
+            for coord in moves:
+                pa[DOACTION.PADDOCKSELECT][coord[0]][coord[1]] = 1
+        
+        if self.checktownplay_possible(BOARDSECTIONS.PADDOCK):
+            if self.old_action == DOACTION.PADDOCKSELECT:
+                moves = self.board.getpossiblepaddockmove(self.player, *self.select_coord)
+                for coord in moves:
+                    pa[DOACTION.PADDOCKSET][coord[0]][coord[1]] = 1
+        
+        if self.checktownplay_possible(BOARDSECTIONS.HARBOR) and self.oldactionnoselection():
+            moves = self.board.getpossiblemove(self.player, str(self.player))
+            for coord in moves:
+                pa[DOACTION.HARBORSELECT][coord[0]][coord[1]] = 1
+        
+        if self.checktownplay_possible(BOARDSECTIONS.HARBOR):
+            if self.old_action == DOACTION.HARBORSELECT:
+                moves = self.board.getpossiblemove(self.player, SPECIALLOCATION.WATER, self.select_coord)
+                for coord in moves:
+                    pa[DOACTION.HARBORSET][coord[0]][coord[1]] = 1
+
+        return pa
 
     #controlled by an rl agent?
     def singlestepmove(self, action : DOACTION, row, col):
         if action == DOACTION.END:
-            if self.main_move == 0:
+            if self.main_move == 0 or self.player.settlements == 0:
                 self.endmove()
                 self.startmove()
                 return True
             else:
                 return False
+
+        if action == DOACTION.TAKENEWCARD:
+            moves = self.board.getpossiblemove(self.player, self.player.card)
+            #TODO: check also if any move left
+            if len(moves) <= 0:
+                self.player.takecard()
+                return True
+            return False
 
         # nothing to do
         if not ((len(self.townstoplay) > 0 or self.main_move > 0) and self.player.settlements != 0):
@@ -137,7 +215,7 @@ class Game:
                 return True
         elif action == DOACTION.HARBORSET and self.old_action == DOACTION.HARBORSELECT:
             moves = self.board.getpossiblemove(self.player, SPECIALLOCATION.WATER, self.select_coord)
-            if (row, col) in moves:
+            if (row, col) not in moves:
                 return False
             if self.board.move_settlement(self.player, *self.select_coord, row, col):
                 self.townstoplay.remove(BOARDSECTIONS.HARBOR)

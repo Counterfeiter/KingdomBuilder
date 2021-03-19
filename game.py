@@ -19,6 +19,9 @@ class DOACTION(Enum):
     HARBORSET = 6
     PADDOCKSELECT = 7
     PADDOCKSET = 8
+    OASIS = 9
+    BARNSELECT = 10
+    BARNSET = 11
 
 class Game:
     def __init__(self, num_players : int, quadrants : list = [], rules : list = []):
@@ -111,8 +114,8 @@ class Game:
         # pa = possible actions
         pa = OrderedDict()
         
-        pa[DOACTION.TAKENEWCARD] = [0]
-        pa[DOACTION.END] = [1] if self.main_move == 0 or self.player.settlements == 0 else [0]
+        pa[DOACTION.TAKENEWCARD] = [[0]]
+        pa[DOACTION.END] = [[1]] if self.main_move == 0 or self.player.settlements == 0 else [[0]]
         ### could be done in a loop... but it is a ordered dict, we will leave at as reference
         # for the flattend action mask array
         pa[DOACTION.MAINMOVE] = [ [0]*20 for i in range(20)]
@@ -122,6 +125,7 @@ class Game:
         pa[DOACTION.HARBORSET] = [ [0]*20 for i in range(20)]
         pa[DOACTION.PADDOCKSELECT] = [ [0]*20 for i in range(20)]
         pa[DOACTION.PADDOCKSET] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.OASIS] = [ [0]*20 for i in range(20)]
         
 
         if self.main_move > 0 and self.player.settlements > 0:
@@ -166,10 +170,34 @@ class Game:
                 for coord in moves:
                     pa[DOACTION.HARBORSET][coord[0]][coord[1]] = 1
 
+        if self.checktownplay_possible(BOARDSECTIONS.OASIS):
+            moves = self.board.getpossiblemove(self.player, TERRAIN.DESERT)
+            for coord in moves:
+                pa[DOACTION.OASIS][coord[0]][coord[1]] = 1
+
+        if self.checktownplay_possible(BOARDSECTIONS.BARN) and self.oldactionnoselection():
+            moves = self.board.getpossiblemove(self.player, str(self.player))
+            for coord in moves:
+                pa[DOACTION.BARNSELECT][coord[0]][coord[1]] = 1
+        
+        if self.checktownplay_possible(BOARDSECTIONS.BARN):
+            if self.old_action == DOACTION.BARNSELECT:
+                moves = self.board.getpossiblemove(self.player, self.player.card, *self.select_coord)
+                for coord in moves:
+                    pa[DOACTION.BARNSET][coord[0]][coord[1]] = 1
+
         return pa
 
     #controlled by an rl agent?
     def singlestepmove(self, action : DOACTION, row, col):
+        res = self._singlestepmove(action, row, col)
+        if res:
+            #store old action if move was valid
+            self.old_action = action
+        return res
+
+    def _singlestepmove(self, action : DOACTION, row, col):
+        moves = None
         if action == DOACTION.END:
             if self.main_move == 0 or self.player.settlements == 0:
                 self.endmove()
@@ -211,7 +239,6 @@ class Game:
         elif action == DOACTION.HARBORSELECT and BOARDSECTIONS.HARBOR in self.townstoplay:
             if self.board.hassettlement(self.player, row, col):
                 self.select_coord = (row, col)
-                self.old_action = DOACTION.HARBORSELECT
                 return True
         elif action == DOACTION.HARBORSET and self.old_action == DOACTION.HARBORSELECT:
             moves = self.board.getpossiblemove(self.player, SPECIALLOCATION.WATER, self.select_coord)
@@ -223,7 +250,6 @@ class Game:
         elif action == DOACTION.PADDOCKSELECT and BOARDSECTIONS.PADDOCK in self.townstoplay:
             if self.board.hassettlement(self.player, row, col):
                 self.select_coord = (row, col)
-                self.old_action = DOACTION.PADDOCKSELECT
                 return True
         elif action == DOACTION.PADDOCKSET and self.old_action == DOACTION.PADDOCKSELECT:
             moves = self.board.getpossiblepaddockmove(self.player, *self.select_coord)
@@ -232,8 +258,16 @@ class Game:
             if self.board.move_settlement(self.player, *self.select_coord, row, col):
                 self.townstoplay.remove(BOARDSECTIONS.PADDOCK)
                 return True
-
+        #debug board
+        if moves:
+            self.board.print_selection(moves)
+        else:
+            print(str(self.board))
         return False
+
+    @property
+    def done(self):
+        return self.game_done
             
     def startmove(self):
         #end game if starter is reached an any player is finished

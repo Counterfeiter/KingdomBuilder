@@ -1,8 +1,9 @@
 import unittest
+import random
 from board import Board
 from player import Player
 from rules import Rules
-from game import Game
+from game import Game, DOACTION
 
 from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
@@ -129,12 +130,6 @@ class TestRules(unittest.TestCase):
         self.assertEqual(self.board.reset_settlement(self.players[1], 8, 8), False)
         self.assertEqual(self.board.reset_settlement(self.players[2], 0, 0), True)
 
-    '''def test_barnmove(self):
-        overlay_terrain(self.board)
-        self.assertEqual(len(self.board.getpossiblepaddockmove(self.players[3], 7, 12)), 0)
-        moves = self.board.getpossiblepaddockmove(self.players[3], 12, 7)
-        #self.board.print_selection(moves)'''
-
     def test_town_to_quadrant(self):
         self.assertEqual(self.board.town_to_boardsection(2, 8).name, self.board.quadrant_order[0])
         self.assertEqual(self.board.town_to_boardsection(4, 17).name, self.board.quadrant_order[1])
@@ -190,6 +185,159 @@ class TestRules(unittest.TestCase):
         #print(score_out)
         #print(rules.player_score_per_rule)
 
+    def test_randomplay1(self):
+        score_sum = [0, 0]
+        play_num_games = 100
+        for _ in range(play_num_games):
+            fixed_quadrants = ["ORACLE", "PADDOCK", "HARBOR", "FARM"]
+            fixed_rules = [CARDRULES.MINERS, CARDRULES.FISHERMEN, CARDRULES.WORKER]
+            #only two players
+            game = Game(2, fixed_quadrants, fixed_rules)
+
+            while not game.done:
+                move_options = []
+                actions = game.actionstomoves()
+                array_index = 0
+                for action, rows in actions.items():
+                    for row_i, row in enumerate(rows):
+                        for col_i, col in enumerate(row):
+                            if col >= 1:
+                                move_options.append([action, row_i, col_i])
+                                array_index += 1
+                
+                # random choise
+                action = random.choice(move_options)
+                self.assertEqual(game.singlestepmove(*action), True)
+            
+            for i, player in enumerate(game.players):
+                score_sum[i] += player.score
+
+        player1, player2 = score_sum[0]/play_num_games, score_sum[1]/play_num_games
+        
+        print("Average random game score: 1. {:.1f} 2. {:.1f}".format(player1, player2))
+
+        self.assertEqual(abs(player1 - 30.0) < 5, True) 
+        self.assertEqual(abs(player2 - 30.0) < 5, True)
+
+    def test_randomplay3(self):
+        player_cnt = 2
+        score_sum = [0] * player_cnt
+        play_num_games = 100
+        for _ in range(play_num_games):
+            fixed_quadrants = ["ORACLE", "PADDOCK", "HARBOR", "FARM"]
+            fixed_rules = [CARDRULES.KNIGHTS, CARDRULES.FARMERS, CARDRULES.LOARDS]
+            #only two players
+            game = Game(2, fixed_quadrants, fixed_rules)
+
+            while not game.done:
+                move_options = []
+                actions = game.actionstomoves()
+                array_index = 0
+                for action, rows in actions.items():
+                    for row_i, row in enumerate(rows):
+                        if type(row) == int:
+                            move_options.append([action, 0, 0])
+                            continue
+                        for col_i, col in enumerate(row):
+                            if col >= 1:
+                                move_options.append([action, row_i, col_i])
+                                array_index += 1
+                
+                # random choise
+                action = random.choice(move_options)
+                self.assertEqual(game.singlestepmove(*action), True)
+            
+            for i, player in enumerate(game.players):
+                score_sum[i] += player.score
+
+        player1, player2 = score_sum[0]/play_num_games, score_sum[1]/play_num_games
+        
+        print("Average random game score: 1. {:.1f} 2. {:.1f}".format(player1, player2))
+
+        self.assertEqual(abs(player1 - 30.0) < 5, True) 
+        self.assertEqual(abs(player2 - 30.0) < 5, True) 
+
+    def test_randomplay1(self):
+        player_cnt = 2
+        score_sum = [0] * player_cnt
+        play_num_games = 100
+        for _ in range(play_num_games):
+            fixed_quadrants = ["ORACLE", "PADDOCK", "HARBOR", "FARM"]
+            fixed_rules = [CARDRULES.MINERS, CARDRULES.FISHERMEN, CARDRULES.WORKER]
+            #only two players
+            game = Game(2, fixed_quadrants, fixed_rules)
+
+            while not game.done:
+                move_options = []
+                actions = game.actionstomoves()
+                array_index = 0
+                for action, rows in actions.items():
+                    for row_i, row in enumerate(rows):
+                        if type(row) == int:
+                            move_options.append([action, 0, 0])
+                            continue
+                        for col_i, col in enumerate(row):
+                            if col >= 1:
+                                move_options.append([action, row_i, col_i])
+                                array_index += 1
+                
+                # random choise
+                action = random.choice(move_options)
+                self.assertEqual(game.singlestepmove(*action), True)
+            
+            for i, player in enumerate(game.players):
+                score_sum[i] += player.score
+
+        player1, player2 = score_sum[0]/play_num_games, score_sum[1]/play_num_games
+        
+        print("Average random game score: 1. {:.1f} 2. {:.1f}".format(player1, player2))
+
+        self.assertEqual(abs(player1 - 30.0) < 5, True) 
+        self.assertEqual(abs(player2 - 30.0) < 5, True) 
+
+
+    def test_randomplay2(self):
+        player_cnt = 5
+        score_sum = [0] * player_cnt
+        play_num_games = 100
+        for _ in range(play_num_games):
+            #fixed_quadrants = ["ORACLE", "PADDOCK", "HARBOR", "FARM"]
+            #fixed_rules = [CARDRULES.MINERS, CARDRULES.FISHERMEN, CARDRULES.WORKER]
+            #only two players
+            game = Game(player_cnt)
+
+            while not game.done:
+                move_options = []
+                actions = game.actionstomoves()
+                array_index = 0
+                for action, rows in actions.items():
+                    for row_i, row in enumerate(rows):
+                        if type(row) == int:
+                            move_options.append([action, 0, 0])
+                            continue
+                        for col_i, col in enumerate(row):
+                            if col >= 1:
+                                move_options.append([action, row_i, col_i])
+                                array_index += 1
+                
+                # random choise
+                action = random.choice(move_options)
+                assert(game.singlestepmove(*action) == True)
+            
+            for i, player in enumerate(game.players):
+                score_sum[i] += player.score
+
+        score_sum = [score_sum[i] / play_num_games for i, x in enumerate(game.players)]
+        
+        print("Average random game score: ", score_sum)
+
+    def test_towermoves(self):
+        fixed_quadrants = ["ORACLE", "PADDOCK", "HARBOR", "FARM"]
+        game = Game(2, fixed_quadrants)
+        moves = game.board.getpossibletowermove(game.player)
+        game.board.print_selection(moves)
+        self.assertEqual(len(moves), 55)
+
     def test_rulecards(self):
         set_default_terrain(self.board)
         #print(self.board)
@@ -243,5 +391,10 @@ class TestRules(unittest.TestCase):
             self.assertEqual(score[i], score_out)
 
 if __name__ == '__main__':
+    #profile perfomance with "python -m cProfile tests.py"
+    #tests = TestRules()
+    #tests.test_randomplay1()
+
+    #run all unit tests
     unittest.main()
 

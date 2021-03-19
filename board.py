@@ -12,8 +12,19 @@ class Board:
         self.max_players = 5
         self.playerlist = [str(x) for x in range(1, self.max_players + 1)]
         self.board_settlements = [ ['0']*20 for i in range(20)]
+        self.board_changed = True
         self.load_quadrants()
-        self.board_env = self.joinquadrants()
+        self.board_env = self.joinquadrants(quadrants)
+        self.generatetowerfields() #precompute
+
+    def generatetowerfields(self):
+        self.gen_tower_field = set()
+        for row in range(20):
+            for col in [0,19]:
+                self.gen_tower_field.add((row, col))
+        for row in [0,19]:
+            for col in range(1,19):
+                self.gen_tower_field.add((row, col))
 
     def load_quadrants(self):
         self.env_quadrants = {"quadrants" : []}
@@ -48,20 +59,26 @@ class Board:
     def env(self):
         return self.board_env
 
-    def is_env(self, row, col, env, board = None):
+    def is_env(self, row, col, env = None, board = None):
+        env_list = [env]
+        #if env none - all env are checked (tower moves)
+        if env == None:
+            env_list = TERRAIN.list_values()
         if board:
-            return board[row][col] == env
+            return board[row][col] in env_list
         else:
-            return self.board_env[row][col] == env
+            return self.board_env[row][col] in env_list
 
-    def resulting_board(self):
-        board_merged = [row[:] for row in self.board_env]
-        for i_row, row in enumerate(self.board_settlements):
-            for i_col, house in enumerate(row):
-                if house in self.playerlist:
-                    board_merged[i_row][i_col] = house
-
-        return board_merged
+    def resulting_board(self, force_refresh = False):
+        if self.board_changed or force_refresh:
+            self.board_merged = [row[:] for row in self.board_env]
+            for i_row, row in enumerate(self.board_settlements):
+                for i_col, house in enumerate(row):
+                    if house in self.playerlist:
+                        self.board_merged[i_row][i_col] = house
+        
+        self.board_changed = False
+        return [row[:] for row in self.board_merged] # return a copy
 
     def grab_town(self, row, col):
         if self.board_env[row][col] == SPECIALLOCATION.TOWNFULL.value:
@@ -75,12 +92,14 @@ class Board:
         place_options = self.getpossiblemove(player, env_rule)
         if (row, col) in place_options:
             self.board_settlements[row][col] = str(player)
+            self.board_changed = True
             return True
         return False
 
     def reset_settlement(self, player : Player, row, col):
         if self.board_settlements[row][col] == str(player):
             self.board_settlements[row][col] = '0'
+            self.board_changed = True
             return True
         return False
 
@@ -92,6 +111,7 @@ class Board:
         if board[row_to][col_to] in possible_env_list:
             self.board_settlements[row_to][col_to] = str(player)
             self.board_settlements[row_from][col_from] = '0'
+            self.board_changed = True
             return True
         return False
 
@@ -185,6 +205,25 @@ class Board:
         
         return moves
 
+    def getpossibletowermove(self, player):
+        board = self.resulting_board()
+
+        fields_in_range = set()
+        fields_free = set()
+        #check if settlements are in range of the given field
+        for (row, col) in self.gen_tower_field:
+            if self.is_env(row, col, None, board):
+                fields_free.add((row, col))
+            nei = Board.neighbours(row, col)
+            for n in nei:
+                if board[n[0]][n[0]] == str(player):
+                    fields_in_range.add((row,col))
+
+        if len(fields_in_range) > 0:
+            return fields_in_range
+        else:
+            return fields_free
+
     def hassettlement(self, player, row, col):
         return self.board_settlements[row][col] == str(player)
 
@@ -194,6 +233,8 @@ class Board:
             env_field = env_field.value # switch from enum to string representation
 
         board = self.resulting_board()
+        if coord_blacklist != None:
+            board[coord_blacklist[0]][coord_blacklist[1]] = self.board_env[coord_blacklist[0]][coord_blacklist[1]] #blacklist
         fields_in_range = set()
         fields_free = set()
         #check if settlements are in range of the given field
@@ -201,7 +242,7 @@ class Board:
             for col in range(20):
                 if self.is_env(row, col, env_field, board):
                     fields_free.add((row, col))
-                if str(player) == board[row][col] and coord_blacklist != (row, col):
+                if str(player) == board[row][col]:
                     for neighbour in self.neighbours(row, col):
                         if self.is_env(*neighbour, env_field, board):
                             fields_in_range.add(neighbour)

@@ -219,7 +219,7 @@ class TestRules(unittest.TestCase):
         self.assertEqual(abs(player1 - 30.0) < 5, True) 
         self.assertEqual(abs(player2 - 30.0) < 5, True)
 
-    def test_randomplay3(self):
+    def test_randomplay2(self):
         player_cnt = 2
         score_sum = [0] * player_cnt
         play_num_games = 100
@@ -254,10 +254,10 @@ class TestRules(unittest.TestCase):
         
         print("Average random game score: 1. {:.1f} 2. {:.1f}".format(player1, player2))
 
-        self.assertEqual(abs(player1 - 30.0) < 5, True) 
-        self.assertEqual(abs(player2 - 30.0) < 5, True) 
+        self.assertAlmostEqual(player1, 51, delta=5) 
+        self.assertAlmostEqual(player2, 51, delta=5) 
 
-    def test_randomplay1(self):
+    def test_randomplay3(self):
         player_cnt = 2
         score_sum = [0] * player_cnt
         play_num_games = 100
@@ -292,11 +292,11 @@ class TestRules(unittest.TestCase):
         
         print("Average random game score: 1. {:.1f} 2. {:.1f}".format(player1, player2))
 
-        self.assertEqual(abs(player1 - 30.0) < 5, True) 
-        self.assertEqual(abs(player2 - 30.0) < 5, True) 
+        self.assertAlmostEqual(player1, 30, delta=5) 
+        self.assertAlmostEqual(player2, 30, delta=5) 
 
 
-    def test_randomplay2(self):
+    def test_randomplay4(self):
         player_cnt = 5
         score_sum = [0] * player_cnt
         play_num_games = 100
@@ -322,7 +322,7 @@ class TestRules(unittest.TestCase):
                 
                 # random choise
                 action = random.choice(move_options)
-                assert(game.singlestepmove(*action) == True)
+                self.assertEqual(game.singlestepmove(*action), True)
             
             for i, player in enumerate(game.players):
                 score_sum[i] += player.score
@@ -335,14 +335,12 @@ class TestRules(unittest.TestCase):
         fixed_quadrants = ["ORACLE", "PADDOCK", "HARBOR", "FARM"]
         game = Game(2, fixed_quadrants)
         moves = game.board.getpossibletowermove(game.player)
-        game.board.print_selection(moves)
+        #game.board.print_selection(moves)
         self.assertEqual(len(moves), 55)
 
     def test_rulecards(self):
         set_default_terrain(self.board)
         #print(self.board)
-
-        
 
         rule_list = [
                         [1, 3, 7],

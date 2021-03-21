@@ -22,6 +22,8 @@ class DOACTION(Enum):
     OASIS = 9
     BARNSELECT = 10
     BARNSET = 11
+    TOWER = 12
+    TAVERN = 13
 
 class Game:
     def __init__(self, num_players : int, quadrants : list = [], rules : list = []):
@@ -56,7 +58,7 @@ class Game:
         if self.current_player >= len(self.players):
             self.current_player = 0
 
-    def place_settlement(self, row, col, env_rule):
+    def place_settlement(self, row, col, env_rule = None):
         if self.board.place_settlement(self.player, row, col, env_rule):
             self.player.decrement_settlement()
             town, tcoord = self.checkTown(row, col)
@@ -108,7 +110,9 @@ class Game:
         return (self.main_move == 3 or self.main_move == 0) and self.player.settlements > 0 and town in self.townstoplay
 
     def oldactionnoselection(self, pass_if = None):
-        return self.old_action == pass_if or not (self.old_action == DOACTION.HARBORSELECT or self.old_action == DOACTION.PADDOCKSELECT)
+        return self.old_action == pass_if or not (self.old_action == DOACTION.HARBORSELECT or 
+                                                    self.old_action == DOACTION.PADDOCKSELECT or 
+                                                    self.old_action == DOACTION.HARBORSELECT)
 
     def actionstomoves(self):
         # pa = possible actions
@@ -118,14 +122,21 @@ class Game:
         pa[DOACTION.END] = [[1]] if self.main_move == 0 or self.player.settlements == 0 else [[0]]
         ### could be done in a loop... but it is a ordered dict, we will leave at as reference
         # for the flattend action mask array
-        pa[DOACTION.MAINMOVE] = [ [0]*20 for i in range(20)]
-        pa[DOACTION.ORACLE] = [ [0]*20 for i in range(20)]
-        pa[DOACTION.FARM] = [ [0]*20 for i in range(20)]
-        pa[DOACTION.HARBORSELECT] = [ [0]*20 for i in range(20)]
-        pa[DOACTION.HARBORSET] = [ [0]*20 for i in range(20)]
-        pa[DOACTION.PADDOCKSELECT] = [ [0]*20 for i in range(20)]
-        pa[DOACTION.PADDOCKSET] = [ [0]*20 for i in range(20)]
-        pa[DOACTION.OASIS] = [ [0]*20 for i in range(20)]
+        pa[DOACTION.MAINMOVE] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.ORACLE] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.FARM] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.HARBORSELECT] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.HARBORSET] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.PADDOCKSELECT] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.PADDOCKSET] = [ [0]*20 for _ in range(20)]
+        ##additional 4 board quadrants
+        '''
+        pa[DOACTION.OASIS] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.BARNSELECT] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.BARNSET] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.TOWER] = [ [0]*20 for _ in range(20)]
+        pa[DOACTION.TAVERN] = [ [0]*20 for _ in range(20)]
+        '''
         
 
         if self.main_move > 0 and self.player.settlements > 0:
@@ -170,6 +181,7 @@ class Game:
                 for coord in moves:
                     pa[DOACTION.HARBORSET][coord[0]][coord[1]] = 1
 
+        '''
         if self.checktownplay_possible(BOARDSECTIONS.OASIS):
             moves = self.board.getpossiblemove(self.player, TERRAIN.DESERT)
             for coord in moves:
@@ -179,13 +191,27 @@ class Game:
             moves = self.board.getpossiblemove(self.player, str(self.player))
             for coord in moves:
                 pa[DOACTION.BARNSELECT][coord[0]][coord[1]] = 1
+            if len(moves) <= 0:
+                pa[DOACTION.TAKENEWCARD][0] = 1
         
         if self.checktownplay_possible(BOARDSECTIONS.BARN):
             if self.old_action == DOACTION.BARNSELECT:
-                moves = self.board.getpossiblemove(self.player, self.player.card, *self.select_coord)
+                moves = self.board.getpossiblemove(self.player, self.player.card, self.select_coord)
                 for coord in moves:
                     pa[DOACTION.BARNSET][coord[0]][coord[1]] = 1
 
+        if self.checktownplay_possible(BOARDSECTIONS.TOWER):
+            if self.old_action == DOACTION.TOWER:
+                moves = self.board.getpossibletowermove(self.player)
+                for coord in moves:
+                    pa[DOACTION.TOWER][coord[0]][coord[1]] = 1
+
+        if self.checktownplay_possible(BOARDSECTIONS.TAVERN):
+            if self.old_action == DOACTION.TAVERN:
+                moves = self.board.getpossibletavernmove(self.player)
+                for coord in moves:
+                    pa[DOACTION.TAVERN][coord[0]][coord[1]] = 1
+        '''
         return pa
 
     #controlled by an rl agent?
@@ -194,6 +220,8 @@ class Game:
         if res:
             #store old action if move was valid
             self.old_action = action
+        else:
+            print("Invalid move selected")
         return res
 
     def _singlestepmove(self, action : DOACTION, row, col):
@@ -258,6 +286,35 @@ class Game:
             if self.board.move_settlement(self.player, *self.select_coord, row, col):
                 self.townstoplay.remove(BOARDSECTIONS.PADDOCK)
                 return True
+        elif action == DOACTION.OASIS and BOARDSECTIONS.OASIS in self.townstoplay:
+            if self.place_settlement(row, col, TERRAIN.DESERT):
+                self.townstoplay.remove(BOARDSECTIONS.OASIS)
+                return True
+        elif action == DOACTION.BARNSELECT and BOARDSECTIONS.BARN in self.townstoplay:
+            if self.board.hassettlement(self.player, row, col):
+                self.select_coord = (row, col)
+                return True
+        elif action == DOACTION.BARNSET and self.old_action == DOACTION.BARNSELECT:
+            moves = self.board.getpossiblemove(self.player, self.player.card, self.select_coord)
+            if (row, col) not in moves:
+                return False
+            if self.board.move_settlement(self.player, *self.select_coord, row, col):
+                self.townstoplay.remove(BOARDSECTIONS.BARN)
+                return True
+        elif action == DOACTION.TOWER and BOARDSECTIONS.TOWER in self.townstoplay:
+            moves = self.board.getpossibletowermove(self.player)
+            if (row, col) not in moves:
+                return False
+            if self.place_settlement(row, col):
+                self.townstoplay.remove(BOARDSECTIONS.OASIS)
+                return True
+        elif action == DOACTION.TAVERN and BOARDSECTIONS.TAVERN in self.townstoplay:
+            moves = self.board.getpossibletavernmove(self.player)
+            if (row, col) not in moves:
+                return False
+            if self.place_settlement(row, col):
+                self.townstoplay.remove(BOARDSECTIONS.TAVERN)
+                return True
         #debug board
         if moves:
             self.board.print_selection(moves)
@@ -284,6 +341,7 @@ class Game:
 
         return True
 
+    #TODO: rework -> use single step moves
     def mainmove(self):
         if not self.startmove():
             return False

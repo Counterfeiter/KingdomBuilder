@@ -11,7 +11,7 @@ class Board:
     def __init__(self, quadrants : list = []):
         self.max_players = 5
         self.playerlist = [str(x) for x in range(1, self.max_players + 1)]
-        self.board_settlements = [ ['0']*20 for i in range(20)]
+        self.board_settlements = [ ['0']*20 for _ in range(20)]
         self.board_changed = True
         self.load_quadrants()
         self.board_env = self.joinquadrants(quadrants)
@@ -88,7 +88,11 @@ class Board:
         else:
             raise ValueError()
 
-    def place_settlement(self, player : Player, row, col, env_rule):
+    def place_settlement(self, player : Player, row, col, env_rule = None):
+        if env_rule == None and self.board_settlements[row][col] == '0':
+            self.board_settlements[row][col] = str(player)
+            self.board_changed = True
+            return True
         place_options = self.getpossiblemove(player, env_rule)
         if (row, col) in place_options:
             self.board_settlements[row][col] = str(player)
@@ -104,6 +108,9 @@ class Board:
         return False
 
     def move_settlement(self, player : Player, row_from, col_from, row_to, col_to):
+        #no move, keep... okay here... remove town move always
+        if row_from == row_to and col_from == col_to:
+            return True
         board = self.resulting_board()
         possible_env_list = TERRAIN.list_values() + [SPECIALLOCATION.WATER.value]
         if board[row_from][col_from] != str(player):

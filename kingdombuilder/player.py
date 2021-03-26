@@ -1,6 +1,6 @@
 import random
 
-from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
+from .accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 class Player:
     MAX_SETTLEMENTS = 40

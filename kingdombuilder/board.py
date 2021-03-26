@@ -1,9 +1,9 @@
 import random
 import os
 
-from player import Player
-from quadrants import quadrants as quadrants_dict
-from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
+from .player import Player
+from .quadrants import quadrants as quadrants_dict
+from .accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 
 class Board:

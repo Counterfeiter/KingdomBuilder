@@ -1,11 +1,11 @@
 import unittest
 import random
-from board import Board
-from player import Player
-from rules import Rules
-from game import Game, DOACTION
+from kingdombuilder import Board
+from kingdombuilder import Player
+from kingdombuilder import Rules
+from kingdombuilder import Game, DOACTION
 
-from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
+from kingdombuilder import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 board_env = """
 . . W . . . . . . . . . W . . . . . . .

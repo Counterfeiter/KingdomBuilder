@@ -1,12 +1,12 @@
 from enum import Enum, unique
 import random
 from typing import OrderedDict
-
-from board import Board
-from rules import Rules
-from player import Player
-from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 import collections
+
+from .board import Board
+from .rules import Rules
+from .player import Player
+from .accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 @unique
 class DOACTION(Enum):
@@ -44,10 +44,6 @@ class Game:
         self.game_done = False
         self.main_move = 3
         self.old_action = None
-
-    @property
-    def __version__(self):
-        return "0.0.1"
 
     @property
     def player(self):
@@ -457,3 +453,16 @@ class Game:
     def endmove(self):
         self.player.takecard()
         self.nextPlayer()
+
+
+if __name__ == "__main__":
+    ### start a random two player game (selfplay)
+    game = Game(2)
+
+    try:
+        while game.mainmove():
+            pass
+    except KeyboardInterrupt:
+        print("Abort game...")
+    else:
+        print("Game done!")

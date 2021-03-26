@@ -1,7 +1,7 @@
 import random
 
-from accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
-from board import Board
+from .accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
+from .board import Board
 
 class Rules:
 

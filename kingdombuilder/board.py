@@ -8,13 +8,13 @@ from .accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 class Board:
 
-    def __init__(self, quadrants : list = []):
+    def __init__(self, quadrants : list = [], rotations : list = []):
         self.max_players = 5
         self.playerlist = [str(x) for x in range(1, self.max_players + 1)]
         self.board_settlements = [ ['0']*20 for _ in range(20)]
         self.board_changed = True
         self.load_quadrants()
-        self.board_env = self.joinquadrants(quadrants)
+        self.board_env = self.joinquadrants(quadrants, rotations)
         self.generatetowerfields() #precompute
 
     def generatetowerfields(self):
@@ -26,6 +26,22 @@ class Board:
             for col in range(1,19):
                 self.gen_tower_field.add((row, col))
 
+    #could rotate whole boards or quadrants...
+    #numpy would be np.rot90(board, 2) and a lot faster
+    def rotate180(self, board):
+        size = len(board)
+        out = [ ['']*size for _ in range(size)]
+
+        for i in range(size):
+            for j in range(size):
+                out[i][size-1-j] = board[size-1-i][j]
+        return out
+
+    def randomrotation(self, board, rot : bool):
+        if rot:
+            return self.rotate180(board) #return a copy
+        return board # return reference of input
+
     def load_quadrants(self):
         self.env_quadrants = {"quadrants" : []}
         quadrant_names = [x.name for x in BOARDSECTIONS.list()]
@@ -34,13 +50,17 @@ class Board:
                 self.env_quadrants["quadrants"].append(qua_name)
                 self.env_quadrants[qua_name] = [row.split() for row in raw_board.strip().split("\n")]
 
-    def joinquadrants(self, quadrant_name_list : list = []):
+    def joinquadrants(self, quadrant_name_list : list = [], rotations : list = []):
         if len(quadrant_name_list) != 4:
             self.quadrant_order = random.sample(self.env_quadrants["quadrants"], 4)
         else:
             self.quadrant_order = quadrant_name_list
-        #TODO: random rotation
-        qua = [self.env_quadrants[x] for x in self.quadrant_order]
+
+        if len(rotations) != 4:
+            qua = [self.randomrotation(self.env_quadrants[x], bool(random.getrandbits(1))) for x in self.quadrant_order]
+        else:
+            qua = [self.randomrotation(self.env_quadrants[x], rotations[i]) for i, x in enumerate(self.quadrant_order)]
+
         board = []
         for row in range(10):
             board.append(qua[0][row] + qua[1][row])

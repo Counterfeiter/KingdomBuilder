@@ -26,13 +26,13 @@ class DOACTION(Enum):
     TAVERN = 13
 
 class Game:
-    def __init__(self, num_players : int, quadrants : list = [], rules : list = []):
+    def __init__(self, num_players : int, quadrants : list = [], rotations : list = [], rules : list = []):
         # 4 player is orginal... 
         # but in expansion modes you get settlements for a 5th player
         if num_players < 1 or num_players > 5:
             raise ValueError()
         #init random quadrants from folder quadrants
-        self.board = Board(quadrants)
+        self.board = Board(quadrants, rotations)
         #init random rules cards
         self.rules = Rules(self.board, rules)
         #init players

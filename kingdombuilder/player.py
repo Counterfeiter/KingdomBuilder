@@ -4,7 +4,14 @@ from .accessories import CARDRULES, TERRAIN, SPECIALLOCATION, BOARDSECTIONS
 
 class Player:
     MAX_SETTLEMENTS = 40
-    def __init__(self, index:str):
+    def __init__(self, index:str, deterministic_cards = False):
+
+        if deterministic_cards:
+            #take 100 cards from virtual stack
+            self.deterministic_card_stack = random.choices(TERRAIN.list(), k=100)
+        else:
+            self.deterministic_card_stack = []
+
         self.takecard()
         self.player_index = index
         self.starter = False # player starts the round
@@ -17,7 +24,10 @@ class Player:
         return self.current_card
 
     def takecard(self):
-        self.current_card = random.choice(TERRAIN.list())
+        if len(self.deterministic_card_stack) > 0:
+            self.current_card = self.deterministic_card_stack.pop(0)
+        else:
+            self.current_card = random.choice(TERRAIN.list())
         return self.current_card
 
     def addTown(self, town : BOARDSECTIONS):

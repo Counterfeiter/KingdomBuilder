@@ -26,7 +26,7 @@ class DOACTION(Enum):
     TAVERN = 13
 
 class Game:
-    def __init__(self, num_players : int, quadrants : list = [], rotations : list = [], rules : list = []):
+    def __init__(self, num_players : int, quadrants : list = [], rotations : list = [], rules : list = [], deterministic = False):
         # 4 player is orginal... 
         # but in expansion modes you get settlements for a 5th player
         if num_players < 1 or num_players > 5:
@@ -36,14 +36,14 @@ class Game:
         #init random rules cards
         self.rules = Rules(self.board, rules)
         #init players
-        self.players = [ Player(str(ind)) for ind in range(1, num_players + 1) ]
+        self.players = [ Player(str(ind), deterministic) for ind in range(1, num_players + 1) ]
         #set random start player
         self.current_player = random.randrange(0, num_players)
         self.players[self.current_player].setStarter()
         self.townstoplay = []
         self.game_done = False
         self.main_move = 3
-        self.old_action = None
+        self.old_action = None            
 
     @property
     def player(self):
@@ -141,7 +141,7 @@ class Game:
                 pa[DOACTION.MAINMOVE][coord[0]][coord[1]] = 1
             #check if player could take a new card 
             if len(moves) <= 0:
-                pa[DOACTION.TAKENEWCARD][0] = 1
+                pa[DOACTION.TAKENEWCARD][0][0] = 1
 
         if self.checktownplay_possible(BOARDSECTIONS.FARM):
             moves = self.board.getpossiblemove(self.player, TERRAIN.GRASS)
@@ -153,7 +153,7 @@ class Game:
             for coord in moves:
                 pa[DOACTION.ORACLE][coord[0]][coord[1]] = 1
             if len(moves) <= 0:
-                pa[DOACTION.TAKENEWCARD][0] = 1
+                pa[DOACTION.TAKENEWCARD][0][0] = 1
 
         if self.checktownplay_possible(BOARDSECTIONS.PADDOCK) and self.oldactionnoselection():
             moves = self.board.getpossiblemove(self.player, str(self.player))
@@ -217,7 +217,7 @@ class Game:
             #store old action if move was valid
             self.old_action = action
         else:
-            print("Invalid move selected")
+            print("Invalid move selected: ", action, row, col, " for player ", self.player, " with card ", self.player.card)
         return res
 
     def _singlestepmove(self, action : DOACTION, row, col):

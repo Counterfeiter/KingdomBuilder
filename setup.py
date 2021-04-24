@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='KingdomBuilder',
-    version='0.0.1',
+    version='0.0.2',
     description='Kingdom Builder Board Game - rules and cli playable',
     url='https://github.com/counterfeiter/kingdombuilder',
     author='Sebastian Förster',

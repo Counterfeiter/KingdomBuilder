@@ -309,7 +309,7 @@ class TestRules(unittest.TestCase):
         player_cnt = 2
         move_copy_env = 30
 
-        game = Game(player_cnt)
+        game = Game(player_cnt, deterministic=True)
         gamecopy = None
         move_cnt = 0
         while not game.done:
@@ -317,14 +317,38 @@ class TestRules(unittest.TestCase):
             action = random.choice(self._actions_to_list(game))
             self.assertEqual(game.singlestepmove(*action), True)
             if gamecopy != None:
-                #same random card, for players for both games
-                gamecopy.player.current_card = game.player.current_card
-                self.assertEqual(gamecopy.singlestepmove(*action), True)
-                #current move should bring equal gold to player
-                self.assertEqual(game.player.score, gamecopy.player.score)
+                step = gamecopy.singlestepmove(*action)
+                self.assertEqual(step, True)
+                #current move should bring equal gold to players
+                self.assertEqual(game.score(), gamecopy.score())
 
             if move_copy_env == move_cnt:
+                game_state = game.gamestate_to_dict()
                 gamecopy = deepcopy(game)
+                game.dict_to_gamestate(game_state)
+            move_cnt += 1
+
+    def test_saverestore(self):
+        player_cnt = 2
+        move_copy_env = 30
+
+        game = Game(player_cnt, deterministic=True)
+        gamecopy = None
+        move_cnt = 0
+        while not game.done:
+            # random choise
+            action = random.choice(self._actions_to_list(game))
+            self.assertEqual(game.singlestepmove(*action), True)
+            if gamecopy != None:
+                step = gamecopy.singlestepmove(*action)
+                self.assertEqual(step, True)
+                #current move should bring equal gold to players
+                self.assertEqual(game.score(), gamecopy.score())
+
+            if move_copy_env == move_cnt:
+                game.save("game_save.ini")
+                gamecopy = deepcopy(game)
+                game = Game.load("game_save.ini")
             move_cnt += 1
     
     def test_display_randomboards(self):

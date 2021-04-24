@@ -1,5 +1,6 @@
 from enum import Enum, unique
 import random
+import configparser
 from typing import OrderedDict
 import collections
 
@@ -43,7 +44,164 @@ class Game:
         self.townstoplay = []
         self.game_done = False
         self.main_move = 3
-        self.old_action = None            
+        self.old_action = DOACTION.END
+        self.select_coord = []
+
+    def gamestate_to_dict(self):
+        game_state = {
+            'GAME': {
+                'current_player' : self.current_player,
+                'townstoplay' : self.townstoplay.copy(),#[t.name for t in self.townstoplay],
+                'done' : self.game_done,
+                'mainmovesettements' : self.main_move,
+                'oldaction' : self.old_action,
+                'selectedcoord' : self.select_coord[:],
+            },
+            'PLAYERS' : {
+                'num_of': len(self.players),
+                'starter': [x.isStarter() for x in self.players].index(True),
+            },
+            'RULES' : {
+                'rules': self.rules.rules.copy(),#[x.name for x in self.rules.rules]
+            },
+            'BOARD' : {
+                'quadrants': self.board.quadrant_order.copy(),
+                'rotation': self.board.board_rotations.copy(),
+                'board': [row[:] for row in self.board.board_merged],#'->\n' + str(self.board)
+            }
+        }
+
+        for player in self.players:
+            game_state['PLAYER' + str(player)] = \
+            {
+                'settlements': player.settlements,
+                'towns': player.towns.copy(),#[t.name for t in player.towns],
+                'card': player.current_card,
+                'stack': player.deterministic_card_stack.copy(),#[x.name for x in player.deterministic_card_stack]
+            }
+
+        return game_state
+
+    def dict_to_gamestate(self, game_state : dict):
+        self.current_player = game_state['GAME']['current_player']
+        self.townstoplay = game_state['GAME']['townstoplay'] #[BOARDSECTIONS[x.upper()] for x in game_state['GAME']['townstoplay'].split(',').replace(' ','')]
+        self.game_done = game_state['GAME']['done']
+        self.main_move = game_state['GAME']['mainmovesettements']
+        self.old_action = game_state['GAME']['oldaction']
+        self.select_coord = game_state['GAME']['selectedcoord']
+        self.players = []
+        for i in range(game_state['PLAYERS']['num_of']):
+            player_str = str(i+1)
+            self.players.append(Player(player_str))
+            self.players[-1].starter = True if game_state['PLAYERS']['starter'] else False
+            self.players[-1].settlements = game_state['PLAYER' + player_str]['settlements']
+            self.players[-1].towns = game_state['PLAYER' + player_str]['towns']
+            self.players[-1].current_card = game_state['PLAYER' + player_str]['card']
+            self.players[-1].deterministic_card_stack = game_state['PLAYER' + player_str]['stack']
+        self.rules.rules = game_state['RULES']['rules']
+        self.board = Board(game_state['BOARD']['quadrants'], game_state['BOARD']['rotation'])
+        self.rules.board = self.board
+
+        towns = [SPECIALLOCATION.TOWNEMPTY.value, SPECIALLOCATION.TOWNFULL.value, SPECIALLOCATION.TOWNHALF.value]
+        player_list = [str(x) for x in self.players]
+        for row in range(20):
+            for col in range(20):
+                if game_state['BOARD']['board'][row][col] in player_list:
+                    self.board.board_settlements[row][col] = game_state['BOARD']['board'][row][col]
+                if game_state['BOARD']['board'][row][col] in towns:
+                    self.board.board_env[row][col] = game_state['BOARD']['board'][row][col]
+
+        self.board.resulting_board(force_refresh=True)
+        #[row.split() for row in game_state['BOARD']['board'].strip().split("\n")]
+
+    # store it in a format that could be read and modified by humans
+    def save(self, filename : str):
+        parser = configparser.ConfigParser()
+        game_dict = self.gamestate_to_dict()
+
+        #better indexing for humans
+        game_dict['PLAYERS']['starter'] += 1
+        game_dict['GAME']['current_player'] += 1
+
+        parser.read_dict(game_dict)
+        parser.remove_option('BOARD', 'board')
+
+        parser["GAME"]["townstoplay"] = ",".join([x.name for x in game_dict["GAME"]["townstoplay"]])
+        parser['GAME']['oldaction'] = game_dict['GAME']['oldaction'].name
+        parser['GAME']['selectedcoord'] = ",".join([str(x) for x in game_dict['GAME']['selectedcoord']])
+        parser['RULES']['rules'] = ",".join([x.name for x in game_dict['RULES']['rules']])
+        parser['BOARD']['quadrants'] = ",".join(game_dict['BOARD']['quadrants'])
+        parser['BOARD']['rotation'] = ",".join([str(x) for x in game_dict['BOARD']['rotation']])
+
+        for i, row in enumerate(game_dict['BOARD']['board']):
+            if i % 2:
+                key = "{:03d}".format(i)
+            else:
+                key = "{:02d}".format(i)
+
+            parser['BOARD'][key] = ",".join(row)
+
+        for i in range(game_dict['PLAYERS']['num_of']):
+            player_str = str(i+1)
+            parser['PLAYER' + player_str]['towns'] = ",".join([x.name for x in game_dict['PLAYER' + player_str]['towns']])
+            parser['PLAYER' + player_str]['card'] = game_dict['PLAYER' + player_str]['card'].name
+            parser['PLAYER' + player_str]['stack'] = ",".join([x.name for x in game_dict['PLAYER' + player_str]['stack']])
+            
+
+        try:
+            with open(filename, 'w') as configfile:
+                parser.write(configfile)
+        except Exception as e:
+            print("Error while saving game to file!")
+            print(str(e))
+
+    @staticmethod
+    def load(filename : str):
+        parser = configparser.ConfigParser()
+        try:
+            parser.read(filename)
+        except Exception as e:
+            print("Error while loading saved game!")
+            print(str(e))
+        else:
+            # a kind of hack... TODO: make it clean
+            game_config = {s:dict(parser.items(s)) for s in parser.sections()}
+            game_config['GAME']['current_player'] = int(game_config['GAME']['current_player']) - 1
+            game_config['GAME']['townstoplay'] = [BOARDSECTIONS[name.upper()] for name in filter(None, game_config['GAME']['townstoplay'].replace(' ', '').split(','))]
+            game_config['GAME']['done'] = bool(game_config['GAME']['done'])
+            game_config['GAME']['mainmovesettements'] = int(game_config['GAME']['mainmovesettements'])
+            game_config['GAME']['oldaction'] = DOACTION[game_config['GAME']['oldaction'].upper()]
+            game_config['GAME']['selectedcoord'] = [int(x) for x in filter(None, game_config['GAME']['selectedcoord'].replace(' ', '').split(','))]
+
+            game_config['RULES']['rules'] = [CARDRULES[name.upper()] for name in game_config['RULES']['rules'].replace(' ', '').split(',')]
+
+            game_config['BOARD']['quadrants'] = [x for x in game_config['BOARD']['quadrants'].replace(' ', '').split(',')]
+            game_config['BOARD']['rotation'] = [bool(x) for x in game_config['BOARD']['rotation'].replace(' ', '').split(',')]
+
+            game_config['PLAYERS']['num_of'] = int(game_config['PLAYERS']['num_of'])
+            game_config['PLAYERS']['starter'] = int(game_config['PLAYERS']['starter']) - 1
+
+            game_config['BOARD']['board'] = [[]]*20
+            for i in range(20):
+                if i % 2:
+                    key = "{:03d}".format(i)
+                else:
+                    key = "{:02d}".format(i)
+
+                game_config['BOARD']['board'][i] = [x for x in game_config['BOARD'][key].replace(' ', '').split(',')]
+
+            for i in range(game_config['PLAYERS']['num_of']):
+                player_str = str(i+1)
+                game_config['PLAYER' + player_str]['towns'] = [BOARDSECTIONS[name.upper()] for name in filter(None, game_config['PLAYER' + player_str]['towns'].replace(' ', '').split(','))]
+                game_config['PLAYER' + player_str]['card'] = TERRAIN[game_config['PLAYER' + player_str]['card'].upper()]
+                game_config['PLAYER' + player_str]['stack'] = [TERRAIN[name.upper()] for name in filter(None, game_config['PLAYER' + player_str]['stack'].replace(' ', '').split(','))]
+                game_config['PLAYER' + player_str]['settlements'] = int(game_config['PLAYER' + player_str]['settlements'])
+
+            game = Game(game_config['PLAYERS']['num_of'])
+            game.dict_to_gamestate(game_config)
+        
+        return game
+
 
     @property
     def player(self):
@@ -89,8 +247,8 @@ class Game:
 
         return None, None
 
-    def getcoordinates(self):
-        inp = input("Please enter row, col or type abort\n")
+    def getcoordinates(self, action = "-"):
+        inp = input("Player {:s} enter row, col or type abort ({})\n".format(str(self.player), action))
         ilist = inp.replace(" ","").split(",")
         if ilist == "abort":
             return None, True
@@ -106,9 +264,8 @@ class Game:
         return (self.main_move == 3 or self.main_move == 0) and self.player.settlements > 0 and town in self.townstoplay
 
     def oldactionnoselection(self, pass_if = None):
-        return self.old_action == pass_if or not (self.old_action == DOACTION.HARBORSELECT or 
-                                                    self.old_action == DOACTION.PADDOCKSELECT or 
-                                                    self.old_action == DOACTION.HARBORSELECT)
+        return self.old_action == pass_if or self.old_action not in [DOACTION.HARBORSELECT,
+                                                    DOACTION.PADDOCKSELECT, DOACTION.HARBORSELECT, DOACTION.BARNSELECT]
 
     def actionstomoves(self):
         # pa = possible actions
@@ -126,13 +283,11 @@ class Game:
         pa[DOACTION.PADDOCKSELECT] = [ [0]*20 for _ in range(20)]
         pa[DOACTION.PADDOCKSET] = [ [0]*20 for _ in range(20)]
         ##additional 4 board quadrants
-        '''
         pa[DOACTION.OASIS] = [ [0]*20 for _ in range(20)]
         pa[DOACTION.BARNSELECT] = [ [0]*20 for _ in range(20)]
         pa[DOACTION.BARNSET] = [ [0]*20 for _ in range(20)]
         pa[DOACTION.TOWER] = [ [0]*20 for _ in range(20)]
         pa[DOACTION.TAVERN] = [ [0]*20 for _ in range(20)]
-        '''
         
 
         if self.main_move > 0 and self.player.settlements > 0:
@@ -177,7 +332,6 @@ class Game:
                 for coord in moves:
                     pa[DOACTION.HARBORSET][coord[0]][coord[1]] = 1
 
-        '''
         if self.checktownplay_possible(BOARDSECTIONS.OASIS):
             moves = self.board.getpossiblemove(self.player, TERRAIN.DESERT)
             for coord in moves:
@@ -187,27 +341,25 @@ class Game:
             moves = self.board.getpossiblemove(self.player, str(self.player))
             for coord in moves:
                 pa[DOACTION.BARNSELECT][coord[0]][coord[1]] = 1
-            if len(moves) <= 0:
-                pa[DOACTION.TAKENEWCARD][0] = 1
         
         if self.checktownplay_possible(BOARDSECTIONS.BARN):
             if self.old_action == DOACTION.BARNSELECT:
                 moves = self.board.getpossiblemove(self.player, self.player.card, self.select_coord)
                 for coord in moves:
                     pa[DOACTION.BARNSET][coord[0]][coord[1]] = 1
+                if len(moves) <= 0:
+                    pa[DOACTION.TAKENEWCARD][0] = 1
 
         if self.checktownplay_possible(BOARDSECTIONS.TOWER):
-            if self.old_action == DOACTION.TOWER:
-                moves = self.board.getpossibletowermove(self.player)
-                for coord in moves:
-                    pa[DOACTION.TOWER][coord[0]][coord[1]] = 1
+            moves = self.board.getpossibletowermove(self.player)
+            for coord in moves:
+                pa[DOACTION.TOWER][coord[0]][coord[1]] = 1
 
         if self.checktownplay_possible(BOARDSECTIONS.TAVERN):
-            if self.old_action == DOACTION.TAVERN:
-                moves = self.board.getpossibletavernmove(self.player)
-                for coord in moves:
-                    pa[DOACTION.TAVERN][coord[0]][coord[1]] = 1
-        '''
+            moves = self.board.getpossibletavernmove(self.player)
+            for coord in moves:
+                pa[DOACTION.TAVERN][coord[0]][coord[1]] = 1
+
         return pa
 
     #controlled by an rl agent?
@@ -302,7 +454,7 @@ class Game:
             if (row, col) not in moves:
                 return False
             if self.place_settlement(row, col):
-                self.townstoplay.remove(BOARDSECTIONS.OASIS)
+                self.townstoplay.remove(BOARDSECTIONS.TOWER)
                 return True
         elif action == DOACTION.TAVERN and BOARDSECTIONS.TAVERN in self.townstoplay:
             moves = self.board.getpossibletavernmove(self.player)
@@ -321,13 +473,17 @@ class Game:
     @property
     def done(self):
         return self.game_done
+
+    def score(self):
+        #also score is saved to player class
+        return self.rules.score(self.players)
             
     def startmove(self):
         #end game if starter is reached an any player is finished
         fin = [x.isfinished() for x in self.players]
         if self.player.isStarter() and True in fin:
-            score = self.rules.score(self.players)
-            print("Game ends with score: ", score)
+            score = self.score()
+            #print("Game ends with score: ", score)
             self.game_done = True
             return False
 
@@ -337,122 +493,51 @@ class Game:
 
         return True
 
-    #TODO: rework -> use single step moves
-    def mainmove(self):
-        if not self.startmove():
-            return False
+    def consoleplayermove(self):
+        current_player = self.player
+        while current_player == self.player:
+            print(self)
+            possbile_action_dict = self.actionstomoves()
+            pos_actions_enums = []
+            for action, moves in possbile_action_dict.items():
+                if max(map(max, moves)) >= 1:
+                    pos_actions_enums.append(action)
+            if len(pos_actions_enums) == 1:
+                action_selected = pos_actions_enums[0]
+            else:
+                print("Player ", str(self.player), " has options to play: ", [x.name for x in pos_actions_enums])
+                inp = input("Select a option player {:s}\n".format(str(self.player)))
+                try:
+                    action_selected = DOACTION[inp.upper()]
+                    if action_selected not in pos_actions_enums:
+                        print("Given action {} is not possible in this situation".format(inp))
+                        continue
+                except:
+                    print("Given action {} unknown".format(inp))
+                    continue
 
-        while (len(self.townstoplay) > 0 or self.main_move > 0) and self.player.settlements != 0:
+            if action_selected == DOACTION.END or action_selected == DOACTION.TAKENEWCARD:
+                assert self.singlestepmove(action_selected, 0, 0) == True
+                continue
+
             print("\nRule Cards: {:^16}{:^16}{:^16}{:^16}\n".format(*[x.name for x in self.rules.rules]))
-            print(self.board)
-            if self.main_move > 0:
-                print("main: Start main move and place three settlements on {:s} ({:s})".format(self.player.card.name, self.player.card.value))
-            if len(self.townstoplay) > 0:
-                print("Write one of the following town options: ", [x.name for x in self.townstoplay])
-            print("end: End move and next player")
-            inp = input("Select a option player {:s}\n".format(str(self.player)))
-
-            if inp == "main":
-                while self.main_move != 0 and self.player.settlements != 0:
-                    moves = self.board.getpossiblemove(self.player, self.player.card)
-                    self.board.print_selection(moves)
-                    coord, abort = self.getcoordinates()
-                    if abort and self.main_move == 3:
-                        break
-                    if coord:
-                        if self.place_settlement(*coord, self.player.card):
-                            self.main_move -= 1                
+            self.board.print_selection(possbile_action_dict[action_selected])
+            coord, abort = self.getcoordinates(action_selected.name)
+            if abort:
                 continue
-            elif inp == "end":
-                if self.main_move == 0 or self.player.settlements == 0:
-                    break
-                else:
-                    print("Please place three settlements (mandatory action)")
-                continue
+            if coord:
+                if self.singlestepmove(action_selected, *coord):
+                    continue
+            print("Coordinates not valid")            
 
-            try:
-                town_special = BOARDSECTIONS[inp.upper()]
-            except:
-                print("given town name {:s} unknown".format(inp))
-                continue
-
-            if town_special not in self.townstoplay:
-                print("player has not this town or is already played this round".format(inp))
-                continue
-
-            if town_special == BOARDSECTIONS.FARM:
-                while 1:
-                    moves = self.board.getpossiblemove(self.player, TERRAIN.GRASS)
-                    self.board.print_selection(moves)
-                    coord, abort = self.getcoordinates()
-                    if abort:
-                        break
-                    if coord:
-                        if self.place_settlement(*coord, TERRAIN.GRASS):
-                            self.townstoplay.remove(BOARDSECTIONS.FARM)
-                            break
-            elif town_special == BOARDSECTIONS.PADDOCK:
-                while 1:
-                    moves = self.board.getpossiblemove(self.player, str(self.player))
-                    self.board.print_selection(moves)
-                    print("Select a settlement for moving")
-                    coord_from, abort = self.getcoordinates()
-                    if abort:
-                        break
-                    if coord_from and self.board.hassettlement(self.player, *coord_from):
-                        moves = self.board.getpossiblepaddockmove(self.player, *coord_from)
-                        if len(moves) == 0:
-                            print("No moving possbile with this selection")
-                            continue
-                        self.board.print_selection(moves)
-                        print("Jump to...")
-                        coord_to, abort = self.getcoordinates()
-                        if abort:
-                            break
-                        if coord_to and coord_to in moves:
-                            if self.move_settlement(*coord_from, *coord_to):
-                                self.townstoplay.remove(BOARDSECTIONS.PADDOCK)
-                                break
-            elif town_special == BOARDSECTIONS.ORACLE:
-                while 1:
-                    moves = self.board.getpossiblemove(self.player, self.player.card)
-                    self.board.print_selection(moves)
-                    coord, abort = self.getcoordinates()
-                    if abort:
-                        break
-                    if coord:
-                        if self.place_settlement(*coord, self.player.card):
-                            self.townstoplay.remove(BOARDSECTIONS.ORACLE)
-                            break
-            elif town_special == BOARDSECTIONS.HARBOR:
-                while 1:
-                    moves = self.board.getpossiblemove(self.player, str(self.player))
-                    self.board.print_selection(moves)
-                    print("Select a settlement for moving")
-                    coord_from, abort = self.getcoordinates()
-                    if abort:
-                        break
-                    if coord_from and self.board.hassettlement(self.player, *coord_from):
-                        moves = self.board.getpossiblemove(self.player, SPECIALLOCATION.WATER, coord_from)
-                        if len(moves) == 0:
-                            print("No moving possible with this selection")
-                            continue
-                        self.board.print_selection(moves)
-                        print("Go to...")
-                        coord_to, abort = self.getcoordinates()
-                        if abort:
-                            break
-                        if coord_to and coord_to in moves:
-                            if self.move_settlement(*coord_from, *coord_to):
-                                self.townstoplay.remove(BOARDSECTIONS.HARBOR)
-                                break
-        self.endmove()
-
-        return True
+        return not self.done
 
     def endmove(self):
         self.player.takecard()
         self.nextPlayer()
+
+    def __str__(self):
+        return "\nRule Cards: {:^16}{:^16}{:^16}{:^16}\n".format(*[x.name for x in self.rules.rules]) + str(self.board)
 
 
 if __name__ == "__main__":
@@ -460,9 +545,11 @@ if __name__ == "__main__":
     game = Game(2)
 
     try:
-        while game.mainmove():
+        while game.consoleplayermove():
             pass
     except KeyboardInterrupt:
         print("Abort game...")
     else:
-        print("Game done!")
+        print("### Game done! ###")
+        for player in game.players:
+            print("Player {:s} score: {:d}".format(player, player.score))

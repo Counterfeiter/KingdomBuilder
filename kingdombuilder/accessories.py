@@ -2,14 +2,14 @@ from enum import Enum, unique
 
 @unique
 class BOARDSECTIONS(Enum):
-    ORACLE = 1
-    FARM = 2
-    OASIS = 3
-    TOWER = 4
-    TAVERN = 5
-    BARN = 6
-    HARBOR = 7
-    PADDOCK= 8
+    ORACLE = 0
+    FARM = 1
+    OASIS = 2
+    TOWER = 3
+    TAVERN = 4
+    BARN = 5
+    HARBOR = 6
+    PADDOCK = 7
 
     @staticmethod
     def list():
@@ -57,7 +57,7 @@ class CARDRULES(Enum):
     HERMITS = 7
     CITIZENS = 8
     WORKER = 9
-    #MERCHANTS = 10 #TODO:
+    MERCHANTS = 10 #TODO add logic to rule engine
 
     @staticmethod
     def list():

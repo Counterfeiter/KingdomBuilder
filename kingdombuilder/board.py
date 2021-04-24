@@ -56,10 +56,11 @@ class Board:
         else:
             self.quadrant_order = quadrant_name_list
 
+        self.board_rotations = rotations
         if len(rotations) != 4:
-            qua = [self.randomrotation(self.env_quadrants[x], bool(random.getrandbits(1))) for x in self.quadrant_order]
-        else:
-            qua = [self.randomrotation(self.env_quadrants[x], rotations[i]) for i, x in enumerate(self.quadrant_order)]
+            self.board_rotations = [bool(random.getrandbits(1)) for x in range(4)]
+
+        qua = [self.randomrotation(self.env_quadrants[x], self.board_rotations[i]) for i, x in enumerate(self.quadrant_order)]
 
         board = []
         for row in range(10):
@@ -89,6 +90,9 @@ class Board:
         else:
             return self.board_env[row][col] in env_list
 
+    def has_anysettlement(self, row, col):
+        return self.board_settlements[row][col] != '0'
+
     def resulting_board(self, force_refresh = False):
         if self.board_changed or force_refresh:
             self.board_merged = [row[:] for row in self.board_env]
@@ -107,6 +111,8 @@ class Board:
             self.board_env[row][col] = SPECIALLOCATION.TOWNEMPTY.value
         else:
             raise ValueError()
+
+        self.board_changed = True
 
     def place_settlement(self, player : Player, row, col, env_rule = None):
         if env_rule == None and self.board_settlements[row][col] == '0':
@@ -239,6 +245,8 @@ class Board:
         fields_free = set()
         #check if settlements are in range of the given field
         for (row, col) in self.gen_tower_field:
+            if self.has_anysettlement(row, col):
+                continue
             if self.is_env(row, col, None, board):
                 fields_free.add((row, col))
             nei = Board.neighbours(row, col)
@@ -285,6 +293,15 @@ class Board:
 
 
     def board_with_selection(self, field_set = None):
+        if type(field_set) == list:
+            sets = set()
+            # board list with 1 == selected convert it to set
+            for row_i, row in enumerate(field_set):
+                for col_i, col in enumerate(row):
+                    if int(col) == 1:
+                        sets.add((row_i, col_i))
+            field_set = sets
+
         board = self.resulting_board()
         str_out = "{:^40}{:^40}\n".format(self.quadrant_order[0], self.quadrant_order[1])
         str_out += "     "

@@ -45,7 +45,10 @@ class Game:
         self.game_done = False
         self.main_move = 3
         self.old_action = DOACTION.END
-        self.select_coord = []
+        self.select_coord = [] # coordinates [row, col] of a selection move (PADDOCK, HARBOR, BARN)
+        # use this setting to draw a card from stack before a players move start and not if it ends
+        # this setting is usefull for some tree search algo. 
+        self.drawcardbefore = False #always false - this setting could be only modified by loading a game
 
     def gamestate_to_dict(self):
         game_state = {
@@ -60,6 +63,7 @@ class Game:
             'PLAYERS' : {
                 'num_of': len(self.players),
                 'starter': [x.isStarter() for x in self.players].index(True),
+                'drawcardbefore': self.drawcardbefore, 
             },
             'RULES' : {
                 'rules': self.rules.rules.copy(),#[x.name for x in self.rules.rules]
@@ -89,11 +93,13 @@ class Game:
         self.main_move = game_state['GAME']['mainmovesettements']
         self.old_action = game_state['GAME']['oldaction']
         self.select_coord = game_state['GAME']['selectedcoord']
+
+        self.drawcardbefore = game_state['PLAYERS']['drawcardbefore']
         self.players = []
         for i in range(game_state['PLAYERS']['num_of']):
             player_str = str(i+1)
             self.players.append(Player(player_str))
-            self.players[-1].starter = True if game_state['PLAYERS']['starter'] else False
+            self.players[-1].starter = True if game_state['PLAYERS']['starter']==i else False
             self.players[-1].settlements = game_state['PLAYER' + player_str]['settlements']
             self.players[-1].towns = game_state['PLAYER' + player_str]['towns']
             self.players[-1].current_card = game_state['PLAYER' + player_str]['card']
@@ -168,7 +174,7 @@ class Game:
             game_config = {s:dict(parser.items(s)) for s in parser.sections()}
             game_config['GAME']['current_player'] = int(game_config['GAME']['current_player']) - 1
             game_config['GAME']['townstoplay'] = [BOARDSECTIONS[name.upper()] for name in filter(None, game_config['GAME']['townstoplay'].replace(' ', '').split(','))]
-            game_config['GAME']['done'] = bool(game_config['GAME']['done'])
+            game_config['GAME']['done'] = game_config['GAME']['done'].lower() == 'true'
             game_config['GAME']['mainmovesettements'] = int(game_config['GAME']['mainmovesettements'])
             game_config['GAME']['oldaction'] = DOACTION[game_config['GAME']['oldaction'].upper()]
             game_config['GAME']['selectedcoord'] = [int(x) for x in filter(None, game_config['GAME']['selectedcoord'].replace(' ', '').split(','))]
@@ -176,10 +182,11 @@ class Game:
             game_config['RULES']['rules'] = [CARDRULES[name.upper()] for name in game_config['RULES']['rules'].replace(' ', '').split(',')]
 
             game_config['BOARD']['quadrants'] = [x for x in game_config['BOARD']['quadrants'].replace(' ', '').split(',')]
-            game_config['BOARD']['rotation'] = [bool(x) for x in game_config['BOARD']['rotation'].replace(' ', '').split(',')]
+            game_config['BOARD']['rotation'] = [x.lower() == 'true' for x in game_config['BOARD']['rotation'].replace(' ', '').split(',')]
 
             game_config['PLAYERS']['num_of'] = int(game_config['PLAYERS']['num_of'])
             game_config['PLAYERS']['starter'] = int(game_config['PLAYERS']['starter']) - 1
+            game_config['PLAYERS']['drawcardbefore'] = game_config['PLAYERS']['drawcardbefore'].lower() == 'true'
 
             game_config['BOARD']['board'] = [[]]*20
             for i in range(20):
@@ -479,6 +486,8 @@ class Game:
         return self.rules.score(self.players)
             
     def startmove(self):
+        if self.drawcardbefore:
+            self.player.takecard()
         #end game if starter is reached an any player is finished
         fin = [x.isfinished() for x in self.players]
         if self.player.isStarter() and True in fin:
@@ -533,7 +542,8 @@ class Game:
         return not self.done
 
     def endmove(self):
-        self.player.takecard()
+        if self.drawcardbefore == False:
+            self.player.takecard()
         self.nextPlayer()
 
     def __str__(self):
